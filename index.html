@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pain Gauge - Real-Time Pain Monitor</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <header>
+        <h1>Pain Gauge</h1>
+        <span class="subtitle">Real-Time Pain Monitor</span>
+    </header>
+
+    <main>
+        <section class="video-panel">
+            <div class="video-container">
+                <video id="webcam" playsinline></video>
+                <canvas id="overlay"></canvas>
+                <div id="no-face-warning" class="hidden">No face detected</div>
+            </div>
+        </section>
+
+        <section class="gauge-panel">
+            <canvas id="gauge" width="400" height="280"></canvas>
+
+            <div class="au-breakdown">
+                <h3>Action Unit Breakdown</h3>
+                <div class="au-bar">
+                    <label>AU4 <span class="au-label">Brow Lowerer</span></label>
+                    <div class="bar-track"><div class="bar-fill" id="au4-bar"></div></div>
+                    <span class="au-value" id="au4-value">0.0</span>
+                </div>
+                <div class="au-bar">
+                    <label>AU6/7 <span class="au-label">Lid Tightener</span></label>
+                    <div class="bar-track"><div class="bar-fill" id="au67-bar"></div></div>
+                    <span class="au-value" id="au67-value">0.0</span>
+                </div>
+                <div class="au-bar">
+                    <label>AU9/10 <span class="au-label">Nose/Lip</span></label>
+                    <div class="bar-track"><div class="bar-fill" id="au910-bar"></div></div>
+                    <span class="au-value" id="au910-value">0.0</span>
+                </div>
+                <div class="au-bar">
+                    <label>AU43 <span class="au-label">Eye Closure</span></label>
+                    <div class="bar-track"><div class="bar-fill" id="au43-bar"></div></div>
+                    <span class="au-value" id="au43-value">0.0</span>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="controls">
+            <button id="calibrate-btn" disabled>Calibrate Neutral Face</button>
+            <button id="reset-btn">Reset Calibration</button>
+        </div>
+        <div class="status-bar">
+            <span id="status">Initializing...</span>
+            <span id="fps">FPS: --</span>
+            <span id="calibration-status">Uncalibrated (using defaults)</span>
+        </div>
+    </footer>
+
+    <!-- MediaPipe dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+
+    <!-- Application -->
+    <script src="js/pain-engine.js"></script>
+    <script src="js/gauge.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

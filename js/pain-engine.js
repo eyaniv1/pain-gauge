@@ -1,0 +1,238 @@
+/**
+ * Pain Scoring Engine (Rules-Based)
+ *
+ * Computes a pain score (0-10) from MediaPipe Face Mesh landmarks
+ * using the PSPI (Prkachin and Solomon Pain Intensity) formula:
+ *
+ *   PSPI = AU4 + max(AU6, AU7) + max(AU9, AU10) + AU43
+ *
+ * Each Action Unit is scored 0-5 based on deviation from a baseline
+ * (calibrated neutral face or population defaults).
+ *
+ * This engine sits behind a simple interface so it can be swapped
+ * for an ML-based model later without changing the rest of the app.
+ */
+
+class PainEngine {
+    constructor(options = {}) {
+        this.baseline = null;
+        this.currentScore = 0;
+        this.smoothingWindow = [];
+        this.smoothingSize = options.smoothingSize || 10;
+        this.lastResult = null;
+    }
+
+    // ── MediaPipe Face Mesh landmark indices ──────────────────────
+
+    static L = {
+        // Face scale reference
+        FOREHEAD: 10,
+        CHIN: 152,
+
+        // AU4 — Brow Lowerer
+        LEFT_INNER_BROW: 55,
+        RIGHT_INNER_BROW: 285,
+        NOSE_BRIDGE_TOP: 168,
+
+        // AU6/7 — Cheek Raiser / Lid Tightener (Eye Aspect Ratio)
+        // Left eye
+        L_EYE_OUTER: 33,
+        L_EYE_P2: 160,
+        L_EYE_P3: 158,
+        L_EYE_INNER: 133,
+        L_EYE_P5: 153,
+        L_EYE_P6: 144,
+        // Right eye
+        R_EYE_OUTER: 263,
+        R_EYE_P2: 387,
+        R_EYE_P3: 385,
+        R_EYE_INNER: 362,
+        R_EYE_P5: 380,
+        R_EYE_P6: 373,
+
+        // AU9/10 — Nose Wrinkler / Upper Lip Raiser
+        NOSE_TIP: 4,
+        UPPER_LIP_TOP: 13,
+
+        // Mouth (for filtering out talking)
+        LOWER_LIP_BOTTOM: 14,
+    };
+
+    // ── Geometry helpers ──────────────────────────────────────────
+
+    static dist(a, b) {
+        return Math.sqrt(
+            (a.x - b.x) ** 2 +
+            (a.y - b.y) ** 2 +
+            (a.z - b.z) ** 2
+        );
+    }
+
+    // ── Raw measurement functions ─────────────────────────────────
+
+    /** Face height for normalization */
+    faceScale(lm) {
+        return PainEngine.dist(lm[PainEngine.L.FOREHEAD], lm[PainEngine.L.CHIN]);
+    }
+
+    /** AU4: distance from inner brows to nose bridge, normalized */
+    measureAU4(lm, scale) {
+        const L = PainEngine.L;
+        const left = PainEngine.dist(lm[L.LEFT_INNER_BROW], lm[L.NOSE_BRIDGE_TOP]);
+        const right = PainEngine.dist(lm[L.RIGHT_INNER_BROW], lm[L.NOSE_BRIDGE_TOP]);
+        return ((left + right) / 2) / scale;
+    }
+
+    /** AU6/7: Eye Aspect Ratio (average of both eyes) */
+    measureEAR(lm) {
+        const ear = (side) => {
+            const L = PainEngine.L;
+            const prefix = side === 'left' ? 'L' : 'R';
+            const p1 = lm[L[`${prefix}_EYE_OUTER`]];
+            const p2 = lm[L[`${prefix}_EYE_P2`]];
+            const p3 = lm[L[`${prefix}_EYE_P3`]];
+            const p4 = lm[L[`${prefix}_EYE_INNER`]];
+            const p5 = lm[L[`${prefix}_EYE_P5`]];
+            const p6 = lm[L[`${prefix}_EYE_P6`]];
+            const v1 = PainEngine.dist(p2, p6);
+            const v2 = PainEngine.dist(p3, p5);
+            const h = PainEngine.dist(p1, p4);
+            return (v1 + v2) / (2 * h);
+        };
+        return (ear('left') + ear('right')) / 2;
+    }
+
+    /** AU9/10: distance from nose tip to upper lip, normalized */
+    measureAU910(lm, scale) {
+        const L = PainEngine.L;
+        return PainEngine.dist(lm[L.NOSE_TIP], lm[L.UPPER_LIP_TOP]) / scale;
+    }
+
+    /** Mouth openness — used to suppress false positives from talking */
+    measureMouthOpen(lm, scale) {
+        const L = PainEngine.L;
+        return PainEngine.dist(lm[L.UPPER_LIP_TOP], lm[L.LOWER_LIP_BOTTOM]) / scale;
+    }
+
+    // ── Calibration ───────────────────────────────────────────────
+
+    /**
+     * Capture the subject's neutral face as baseline.
+     * Call this when the person is relaxed and not in pain.
+     * Averages over multiple frames if called repeatedly.
+     */
+    calibrate(landmarks) {
+        const scale = this.faceScale(landmarks);
+        const measurement = {
+            au4: this.measureAU4(landmarks, scale),
+            ear: this.measureEAR(landmarks),
+            au910: this.measureAU910(landmarks, scale),
+            mouthOpen: this.measureMouthOpen(landmarks, scale),
+        };
+
+        if (!this.baseline) {
+            this.baseline = { ...measurement, samples: 1 };
+        } else {
+            // Running average
+            const n = this.baseline.samples;
+            this.baseline.au4 = (this.baseline.au4 * n + measurement.au4) / (n + 1);
+            this.baseline.ear = (this.baseline.ear * n + measurement.ear) / (n + 1);
+            this.baseline.au910 = (this.baseline.au910 * n + measurement.au910) / (n + 1);
+            this.baseline.mouthOpen = (this.baseline.mouthOpen * n + measurement.mouthOpen) / (n + 1);
+            this.baseline.samples = n + 1;
+        }
+    }
+
+    resetCalibration() {
+        this.baseline = null;
+        this.smoothingWindow = [];
+        this.currentScore = 0;
+    }
+
+    isCalibrated() {
+        return this.baseline !== null;
+    }
+
+    // ── Main scoring ──────────────────────────────────────────────
+
+    /**
+     * Process a frame of face landmarks and return a pain result.
+     *
+     * @param {Array} landmarks - MediaPipe Face Mesh landmarks (468 points)
+     * @returns {{ score: number, rawScore: number, aus: object, pspi: number }}
+     */
+    process(landmarks) {
+        if (!landmarks || landmarks.length < 468) {
+            return this.lastResult || { score: 0, rawScore: 0, aus: { au4: 0, au6_7: 0, au9_10: 0, au43: 0 }, pspi: 0 };
+        }
+
+        const scale = this.faceScale(landmarks);
+
+        // Raw measurements
+        const rawAU4 = this.measureAU4(landmarks, scale);
+        const rawEAR = this.measureEAR(landmarks);
+        const rawAU910 = this.measureAU910(landmarks, scale);
+        const mouthOpen = this.measureMouthOpen(landmarks, scale);
+
+        // Baseline (calibrated or population defaults)
+        const base = this.baseline || {
+            au4: 0.18,
+            ear: 0.27,
+            au910: 0.06,
+            mouthOpen: 0.01,
+        };
+
+        // ── Score each AU (0–5) ──
+
+        // AU4: brow lowers → distance decreases
+        const au4Dev = Math.max(0, (base.au4 - rawAU4) / base.au4);
+        const au4Score = Math.min(5, au4Dev * 12);
+
+        // AU6/7: eyes tighten → EAR decreases
+        const earDev = Math.max(0, (base.ear - rawEAR) / base.ear);
+        const au6_7Score = Math.min(5, earDev * 8);
+
+        // AU9/10: nose wrinkle / lip raise → nose-lip distance decreases
+        const au910Dev = Math.max(0, (base.au910 - rawAU910) / base.au910);
+        const au9_10Score = Math.min(5, au910Dev * 12);
+
+        // AU43: eye closure → EAR near zero
+        let au43Score = 0;
+        if (earDev > 0.55) {
+            au43Score = Math.min(5, (earDev - 0.55) * 11);
+        }
+
+        // ── Suppress talking false positives ──
+        // When mouth is wide open (talking), reduce AU9/10 contribution
+        const mouthDev = (mouthOpen - (base.mouthOpen || 0.01)) / 0.05;
+        const talkingSuppression = Math.max(0, Math.min(1, 1 - mouthDev * 0.5));
+        const adjustedAU910 = au9_10Score * talkingSuppression;
+
+        // ── PSPI formula ──
+        const pspi = au4Score + Math.max(au6_7Score, au6_7Score) + Math.max(adjustedAU910, adjustedAU910) + au43Score;
+
+        // Normalize to 0–10
+        const rawPain = Math.min(10, (pspi / 15) * 10);
+
+        // Temporal smoothing (exponential moving average)
+        this.smoothingWindow.push(rawPain);
+        if (this.smoothingWindow.length > this.smoothingSize) {
+            this.smoothingWindow.shift();
+        }
+        this.currentScore = this.smoothingWindow.reduce((a, b) => a + b, 0) / this.smoothingWindow.length;
+
+        this.lastResult = {
+            score: Math.round(this.currentScore * 10) / 10,
+            rawScore: Math.round(rawPain * 10) / 10,
+            aus: {
+                au4: Math.round(au4Score * 10) / 10,
+                au6_7: Math.round(au6_7Score * 10) / 10,
+                au9_10: Math.round(adjustedAU910 * 10) / 10,
+                au43: Math.round(au43Score * 10) / 10,
+            },
+            pspi: Math.round(pspi * 10) / 10,
+        };
+
+        return this.lastResult;
+    }
+}
