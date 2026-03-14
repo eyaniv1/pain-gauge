@@ -23,11 +23,11 @@ class PainEngine {
         this.lastResult = null;
 
         // Tunable sensitivity parameters
-        this.au4Sensitivity = options.au4Sensitivity ?? 12;
-        this.au67Sensitivity = options.au67Sensitivity ?? 8;
-        this.au910Sensitivity = options.au910Sensitivity ?? 12;
+        this.au4Sensitivity = options.au4Sensitivity ?? 5;
+        this.au67Sensitivity = options.au67Sensitivity ?? 4;
+        this.au910Sensitivity = options.au910Sensitivity ?? 5;
         this.au43Threshold = options.au43Threshold ?? 0.55;
-        this.au43Sensitivity = options.au43Sensitivity ?? 11;
+        this.au43Sensitivity = options.au43Sensitivity ?? 8;
         this.talkingSuppression = options.talkingSuppression ?? 0.5;
     }
 

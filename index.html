@@ -82,34 +82,28 @@
             <button type="button" class="btn btn-start btn-small" id="start-btn">Start Session</button>
             <button type="button" class="btn btn-end btn-small hidden" id="end-btn">End Session</button>
             <button type="button" class="btn btn-small" id="recalibrate-btn">Calibrate</button>
-            <div class="source-buttons">
-                <button type="button" class="btn btn-small btn-source active" id="camera-btn" title="Live Camera">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                </button>
-                <button type="button" class="btn btn-small btn-source" id="load-video-btn" title="Load Video File">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
-                </button>
-            </div>
+            <button type="button" class="btn btn-small btn-source active" id="camera-btn" title="Live Camera">Cam</button>
+            <button type="button" class="btn btn-small btn-source" id="load-video-btn" title="Load Video File">File</button>
             <input type="file" id="video-file-input" accept="video/*" class="hidden">
-            <button type="button" class="btn btn-small" id="settings-btn">Settings</button>
+            <button type="button" class="btn btn-small" id="settings-btn" title="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
         </header>
 
         <div class="settings-panel hidden" id="settings-panel">
             <div class="settings-grid">
                 <div class="setting-item">
                     <label for="set-au4-sens">AU4 Sensitivity</label>
-                    <input type="range" id="set-au4-sens" min="1" max="30" step="0.5" value="12">
-                    <span class="setting-value" id="val-au4-sens">12</span>
+                    <input type="range" id="set-au4-sens" min="1" max="30" step="0.5" value="5">
+                    <span class="setting-value" id="val-au4-sens">5</span>
                 </div>
                 <div class="setting-item">
                     <label for="set-au67-sens">AU6/7 Sensitivity</label>
-                    <input type="range" id="set-au67-sens" min="1" max="20" step="0.5" value="8">
-                    <span class="setting-value" id="val-au67-sens">8</span>
+                    <input type="range" id="set-au67-sens" min="1" max="20" step="0.5" value="4">
+                    <span class="setting-value" id="val-au67-sens">4</span>
                 </div>
                 <div class="setting-item">
                     <label for="set-au910-sens">AU9/10 Sensitivity</label>
-                    <input type="range" id="set-au910-sens" min="1" max="30" step="0.5" value="12">
-                    <span class="setting-value" id="val-au910-sens">12</span>
+                    <input type="range" id="set-au910-sens" min="1" max="30" step="0.5" value="5">
+                    <span class="setting-value" id="val-au910-sens">5</span>
                 </div>
                 <div class="setting-item">
                     <label for="set-au43-thresh">AU43 Threshold</label>
@@ -118,8 +112,8 @@
                 </div>
                 <div class="setting-item">
                     <label for="set-au43-sens">AU43 Sensitivity</label>
-                    <input type="range" id="set-au43-sens" min="1" max="25" step="0.5" value="11">
-                    <span class="setting-value" id="val-au43-sens">11</span>
+                    <input type="range" id="set-au43-sens" min="1" max="25" step="0.5" value="8">
+                    <span class="setting-value" id="val-au43-sens">8</span>
                 </div>
                 <div class="setting-item">
                     <label for="set-talk-supp">Talk Suppression</label>

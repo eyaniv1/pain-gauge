@@ -15,11 +15,11 @@
 
     const SETTINGS_KEY = 'painGaugeSettings';
     const DEFAULTS = {
-        au4Sensitivity: 12,
-        au67Sensitivity: 8,
-        au910Sensitivity: 12,
+        au4Sensitivity: 5,
+        au67Sensitivity: 4,
+        au910Sensitivity: 5,
         au43Threshold: 0.55,
-        au43Sensitivity: 11,
+        au43Sensitivity: 8,
         talkingSuppression: 0.5,
         smoothingSize: 8,
         sampleIntervalMs: 500,
@@ -44,6 +44,8 @@
     let sessionActive = false;
     let SAMPLE_INTERVAL_MS = settings.sampleIntervalMs;
     let inputMode = 'camera'; // 'camera' or 'video'
+    let autoCalibFrames = 0;
+    const AUTO_CALIB_COUNT = 30; // silent auto-calibrate from first ~1s of frames
     let cameraInstance = null;
     let videoLoopId = null;
 
@@ -217,6 +219,7 @@
         isCalibrating = true;
         calibrationFrames = 0;
         engine.resetCalibration();
+        autoCalibFrames = AUTO_CALIB_COUNT; // skip auto-calib after manual
         // Set the baseline pain level from hidden input
         engine.baselinePainLevel = parseInt(baselinePainInput.value);
         calibrateBtn.disabled = true;
@@ -409,6 +412,13 @@
             if (calibrationFrames >= CALIBRATION_FRAME_COUNT) {
                 onCalibrationComplete();
             }
+            return;
+        }
+
+        // Auto-calibrate from first frames if no manual calibration yet
+        if (!engine.isCalibrated() && autoCalibFrames < AUTO_CALIB_COUNT) {
+            engine.calibrate(landmarks);
+            autoCalibFrames++;
             return;
         }
 
