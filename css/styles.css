@@ -102,18 +102,31 @@ main {
 
 /* ── View Panels (show/hide) ─────────────────────────────── */
 
-.view-panel {
-    display: none;
+.panels-container {
     flex: 1;
     min-height: 0;
+    position: relative;
     border: 1px solid #ddd;
     border-top: none;
     border-radius: 0 0 12px 12px;
     overflow: hidden;
 }
 
+.view-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
 .view-panel.active {
-    display: flex;
+    visibility: visible;
+    opacity: 1;
+    z-index: 1;
 }
 
 #panel-camera {
@@ -122,6 +135,7 @@ main {
 
 #panel-history {
     background: #fff;
+    display: flex;
 }
 
 #session-chart {

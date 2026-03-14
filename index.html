@@ -21,15 +21,17 @@
             </div>
 
             <!-- View panels (only one visible at a time) -->
-            <div class="view-panel active" id="panel-camera">
-                <div class="video-container">
-                    <video id="webcam" playsinline></video>
-                    <canvas id="overlay"></canvas>
-                    <div id="no-face-warning" class="hidden">No face detected</div>
+            <div class="panels-container">
+                <div class="view-panel active" id="panel-camera">
+                    <div class="video-container">
+                        <video id="webcam" playsinline></video>
+                        <canvas id="overlay"></canvas>
+                        <div id="no-face-warning" class="hidden">No face detected</div>
+                    </div>
                 </div>
-            </div>
-            <div class="view-panel" id="panel-history">
-                <canvas id="session-chart"></canvas>
+                <div class="view-panel" id="panel-history">
+                    <canvas id="session-chart"></canvas>
+                </div>
             </div>
 
             <script>
