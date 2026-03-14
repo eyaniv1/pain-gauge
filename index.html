@@ -28,15 +28,39 @@
                     What is the patient's <strong>current pain level</strong>?
                 </p>
 
-                <!-- Pain level selector -->
+                <!-- Pain level selector (tap buttons) -->
                 <div class="pain-selector" id="pain-selector">
-                    <input type="range" id="baseline-pain" min="0" max="10" step="1" value="0">
-                    <div class="pain-selector-labels">
-                        <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
-                        <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+                    <div class="pain-buttons">
+                        <button type="button" class="pain-btn selected" data-value="0" onclick="selectPainLevel(0)">0</button>
+                        <button type="button" class="pain-btn" data-value="1" onclick="selectPainLevel(1)">1</button>
+                        <button type="button" class="pain-btn" data-value="2" onclick="selectPainLevel(2)">2</button>
+                        <button type="button" class="pain-btn" data-value="3" onclick="selectPainLevel(3)">3</button>
+                        <button type="button" class="pain-btn" data-value="4" onclick="selectPainLevel(4)">4</button>
+                        <button type="button" class="pain-btn" data-value="5" onclick="selectPainLevel(5)">5</button>
+                        <button type="button" class="pain-btn" data-value="6" onclick="selectPainLevel(6)">6</button>
+                        <button type="button" class="pain-btn" data-value="7" onclick="selectPainLevel(7)">7</button>
+                        <button type="button" class="pain-btn" data-value="8" onclick="selectPainLevel(8)">8</button>
+                        <button type="button" class="pain-btn" data-value="9" onclick="selectPainLevel(9)">9</button>
+                        <button type="button" class="pain-btn" data-value="10" onclick="selectPainLevel(10)">10</button>
                     </div>
                     <div class="pain-selector-value" id="baseline-pain-value">0 — No Pain</div>
+                    <input type="hidden" id="baseline-pain" value="0">
                 </div>
+
+                <script>
+                    var painLabelsInline = [
+                        'No Pain', 'Minimal', 'Minimal', 'Mild', 'Mild',
+                        'Moderate', 'Moderate', 'Severe', 'Severe', 'Very Severe', 'Worst Possible'
+                    ];
+                    function selectPainLevel(val) {
+                        document.getElementById('baseline-pain').value = val;
+                        document.getElementById('baseline-pain-value').textContent = val + ' — ' + painLabelsInline[val];
+                        var btns = document.querySelectorAll('.pain-btn');
+                        for (var i = 0; i < btns.length; i++) {
+                            btns[i].classList.toggle('selected', parseInt(btns[i].dataset.value) === val);
+                        }
+                    }
+                </script>
 
                 <div class="calib-progress hidden" id="calib-progress">
                     <div class="calib-progress-bar" id="calib-progress-bar"></div>

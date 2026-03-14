@@ -195,57 +195,87 @@ body {
 /* Pain level selector */
 .pain-selector {
     width: 100%;
-    max-width: 360px;
+    max-width: 420px;
     margin: 0 auto 20px;
 }
 
-.pain-selector input[type="range"] {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 8px;
-    border-radius: 4px;
-    background: linear-gradient(to right, #fff 0%, #e74c3c 100%);
-    outline: none;
-    cursor: pointer;
-}
-
-.pain-selector input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: #fff;
-    border: 3px solid #e74c3c;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.pain-selector input[type="range"]::-moz-range-thumb {
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: #fff;
-    border: 3px solid #e74c3c;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.pain-selector-labels {
+.pain-buttons {
     display: flex;
-    justify-content: space-between;
-    margin-top: 6px;
-    font-size: 11px;
-    color: #888;
-    padding: 0 2px;
+    gap: 4px;
+    justify-content: center;
 }
+
+.pain-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ccc;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.pain-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.pain-btn.selected {
+    color: #fff;
+    border-color: #fff;
+    transform: scale(1.15);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Color each button on the pain gradient */
+.pain-btn[data-value="0"]  { background: rgba(255,255,255,0.15); }
+.pain-btn[data-value="1"]  { background: rgba(255,230,230,0.2); }
+.pain-btn[data-value="2"]  { background: rgba(255,200,200,0.25); }
+.pain-btn[data-value="3"]  { background: rgba(255,170,170,0.3); }
+.pain-btn[data-value="4"]  { background: rgba(255,140,140,0.35); }
+.pain-btn[data-value="5"]  { background: rgba(255,110,110,0.4); }
+.pain-btn[data-value="6"]  { background: rgba(240,80,80,0.45); }
+.pain-btn[data-value="7"]  { background: rgba(220,60,60,0.5); }
+.pain-btn[data-value="8"]  { background: rgba(200,40,40,0.55); }
+.pain-btn[data-value="9"]  { background: rgba(180,20,20,0.6); }
+.pain-btn[data-value="10"] { background: rgba(160,0,0,0.65); }
+
+.pain-btn.selected[data-value="0"]  { background: rgba(255,255,255,0.35); }
+.pain-btn.selected[data-value="1"]  { background: rgba(255,220,220,0.5); }
+.pain-btn.selected[data-value="2"]  { background: rgba(255,190,190,0.55); }
+.pain-btn.selected[data-value="3"]  { background: rgba(255,160,160,0.6); }
+.pain-btn.selected[data-value="4"]  { background: rgba(255,130,130,0.65); }
+.pain-btn.selected[data-value="5"]  { background: rgba(255,100,100,0.7); }
+.pain-btn.selected[data-value="6"]  { background: rgba(240,70,70,0.75); }
+.pain-btn.selected[data-value="7"]  { background: rgba(220,50,50,0.8); }
+.pain-btn.selected[data-value="8"]  { background: rgba(200,30,30,0.85); }
+.pain-btn.selected[data-value="9"]  { background: rgba(180,10,10,0.9); }
+.pain-btn.selected[data-value="10"] { background: rgba(160,0,0,0.95); }
 
 .pain-selector-value {
-    margin-top: 8px;
+    margin-top: 10px;
     font-size: 16px;
     font-weight: 600;
     color: #fff;
+}
+
+@media (max-width: 420px) {
+    .pain-btn {
+        width: 30px;
+        height: 30px;
+        font-size: 12px;
+        border-radius: 6px;
+    }
+
+    .pain-buttons {
+        gap: 3px;
+    }
 }
 
 .calib-progress {

@@ -38,8 +38,7 @@
     const calibProgress = document.getElementById('calib-progress');
     const calibProgressBar = document.getElementById('calib-progress-bar');
     const calibStatus = document.getElementById('calib-status');
-    const baselinePainSlider = document.getElementById('baseline-pain');
-    const baselinePainValue = document.getElementById('baseline-pain-value');
+    const baselinePainInput = document.getElementById('baseline-pain');
 
     // ── DOM refs: Main ────────────────────────────────────────────
 
@@ -101,18 +100,6 @@
         timerInterval = null;
     }
 
-    // ── Pain level slider ──────────────────────────────────────────
-
-    const painLabels = [
-        'No Pain', 'Minimal', 'Minimal', 'Mild', 'Mild',
-        'Moderate', 'Moderate', 'Severe', 'Severe', 'Very Severe', 'Worst Possible'
-    ];
-
-    baselinePainSlider.addEventListener('input', () => {
-        const val = parseInt(baselinePainSlider.value);
-        baselinePainValue.textContent = `${val} — ${painLabels[val]}`;
-    });
-
     // ── Calibration ───────────────────────────────────────────────
 
     let calibrationFrames = 0;
@@ -123,8 +110,8 @@
         isCalibrating = true;
         calibrationFrames = 0;
         engine.resetCalibration();
-        // Set the baseline pain level from slider
-        engine.baselinePainLevel = parseInt(baselinePainSlider.value);
+        // Set the baseline pain level from hidden input
+        engine.baselinePainLevel = parseInt(baselinePainInput.value);
         calibrateBtn.disabled = true;
         calibrateBtn.textContent = 'Hold still...';
         calibInstructions.innerHTML = 'Capturing face at <strong>current pain level</strong>...';
@@ -179,8 +166,7 @@
         calibrateBtn.textContent = 'Calibrate';
         calibInstructions.innerHTML = 'What is the patient\'s <strong>current pain level</strong>?';
         calibStatus.textContent = 'Ready to calibrate';
-        baselinePainSlider.value = 0;
-        baselinePainValue.textContent = '0 — No Pain';
+        selectPainLevel(0);
         engine.resetCalibration();
         showScreen(screenCalib);
     });
