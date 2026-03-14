@@ -715,6 +715,11 @@ footer {
         font-size: 11px;
     }
 
+    header .btn-source,
+    header #settings-btn {
+        padding: 6px;
+    }
+
     /* Main */
     #screen-main {
         height: auto;
