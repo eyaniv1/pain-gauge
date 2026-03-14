@@ -192,21 +192,22 @@ class PainEngine {
             mouthOpen: 0.01,
         };
 
-        // ── Score each AU (0–5) ──
+        // ── Score each AU (–5 to +5, signed) ──
+        // Positive = more pain than baseline, negative = more relaxed
 
         // AU4: brow lowers → distance decreases
-        const au4Dev = Math.max(0, (base.au4 - rawAU4) / base.au4);
-        const au4Score = Math.min(5, au4Dev * this.au4Sensitivity);
+        const au4Dev = (base.au4 - rawAU4) / base.au4;
+        const au4Score = Math.max(-5, Math.min(5, au4Dev * this.au4Sensitivity));
 
         // AU6/7: eyes tighten → EAR decreases
-        const earDev = Math.max(0, (base.ear - rawEAR) / base.ear);
-        const au6_7Score = Math.min(5, earDev * this.au67Sensitivity);
+        const earDev = (base.ear - rawEAR) / base.ear;
+        const au6_7Score = Math.max(-5, Math.min(5, earDev * this.au67Sensitivity));
 
         // AU9/10: nose wrinkle / lip raise → nose-lip distance decreases
-        const au910Dev = Math.max(0, (base.au910 - rawAU910) / base.au910);
-        const au9_10Score = Math.min(5, au910Dev * this.au910Sensitivity);
+        const au910Dev = (base.au910 - rawAU910) / base.au910;
+        const au9_10Score = Math.max(-5, Math.min(5, au910Dev * this.au910Sensitivity));
 
-        // AU43: eye closure → EAR near zero
+        // AU43: eye closure → EAR near zero (only positive, can't have negative closure)
         let au43Score = 0;
         if (earDev > this.au43Threshold) {
             au43Score = Math.min(5, (earDev - this.au43Threshold) * this.au43Sensitivity);
@@ -218,16 +219,23 @@ class PainEngine {
         const talkSuppression = Math.max(0, Math.min(1, 1 - mouthDev * this.talkingSuppression));
         const adjustedAU910 = au9_10Score * talkSuppression;
 
-        // ── PSPI formula ──
-        const pspi = au4Score + Math.max(au6_7Score, au6_7Score) + Math.max(adjustedAU910, adjustedAU910) + au43Score;
+        // ── PSPI formula (signed — can be negative if face relaxes) ──
+        const pspi = au4Score + au6_7Score + adjustedAU910 + au43Score;
 
-        // Normalize PSPI deviation to 0–10 range
-        const deviationPain = Math.min(10, (pspi / 15) * 10);
+        // Map PSPI to a deviation from baseline: ±15 maps to ±10
+        const deviationPain = Math.max(-10, Math.min(10, (pspi / 15) * 10));
 
-        // Add baseline pain level: calibrated face = baselinePainLevel,
-        // deviations above it add to the score, capped at 10
-        const remainingRange = 10 - this.baselinePainLevel;
-        const rawPain = Math.min(10, this.baselinePainLevel + (deviationPain / 10) * remainingRange);
+        // Apply deviation bidirectionally from baseline pain level
+        // Positive deviation scales into remaining range above baseline
+        // Negative deviation scales into range below baseline
+        let rawPain;
+        if (deviationPain >= 0) {
+            const remainingRange = 10 - this.baselinePainLevel;
+            rawPain = this.baselinePainLevel + (deviationPain / 10) * remainingRange;
+        } else {
+            rawPain = this.baselinePainLevel + (deviationPain / 10) * this.baselinePainLevel;
+        }
+        rawPain = Math.max(0, Math.min(10, rawPain));
 
         // Temporal smoothing (exponential moving average)
         this.smoothingWindow.push(rawPain);
@@ -240,9 +248,9 @@ class PainEngine {
             score: Math.round(this.currentScore * 10) / 10,
             rawScore: Math.round(rawPain * 10) / 10,
             aus: {
-                au4: Math.round(au4Score * 10) / 10,
-                au6_7: Math.round(au6_7Score * 10) / 10,
-                au9_10: Math.round(adjustedAU910 * 10) / 10,
+                au4: Math.round(Math.max(0, au4Score) * 10) / 10,
+                au6_7: Math.round(Math.max(0, au6_7Score) * 10) / 10,
+                au9_10: Math.round(Math.max(0, adjustedAU910) * 10) / 10,
                 au43: Math.round(au43Score * 10) / 10,
             },
             pspi: Math.round(pspi * 10) / 10,
