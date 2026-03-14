@@ -647,6 +647,20 @@ footer {
 
 /* ── Source Buttons ──────────────────────────────────────── */
 
+.btn-source,
+#settings-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 0;
+}
+
+.btn-source svg,
+#settings-btn svg {
+    display: block;
+    flex-shrink: 0;
+}
+
 .btn-source {
     background: #f5f5f5;
     color: #888;
