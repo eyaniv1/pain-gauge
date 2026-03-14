@@ -1,21 +1,48 @@
 /**
  * Main Application
  *
- * Flow: Calibration Screen → Main Screen (Start/End session)
+ * Flow: Main Screen (live gauge, start/end session) → optional Calibration
  *
- * - Calibration: full-screen camera, capture neutral face baseline
  * - Main: gauge + camera/history toggle, session start/end controls
- * - Start: begins measuring and recording pain scores
- * - End: stops recording, graph remains visible
- * - Next Start: clears previous graph, begins new session
+ * - Calibration: accessed via Calibrate button, captures face baseline
+ * - Settings: tunable sensitivity parameters, persisted to localStorage
  */
 
 (function () {
     'use strict';
 
+    // ── Settings persistence ─────────────────────────────────────
+
+    const SETTINGS_KEY = 'painGaugeSettings';
+    const DEFAULTS = {
+        au4Sensitivity: 12,
+        au67Sensitivity: 8,
+        au910Sensitivity: 12,
+        au43Threshold: 0.55,
+        au43Sensitivity: 11,
+        talkingSuppression: 0.5,
+        smoothingSize: 8,
+        sampleIntervalMs: 500,
+    };
+
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem(SETTINGS_KEY);
+            if (saved) return { ...DEFAULTS, ...JSON.parse(saved) };
+        } catch (e) { /* ignore */ }
+        return { ...DEFAULTS };
+    }
+
+    function saveSettings(s) {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    }
+
+    let settings = loadSettings();
+
     // ── State ─────────────────────────────────────────────────────
 
     let sessionActive = false;
+    let SAMPLE_INTERVAL_MS = settings.sampleIntervalMs;
 
     // ── Screens ───────────────────────────────────────────────────
 
@@ -58,11 +85,82 @@
         au43: { bar: document.getElementById('au43-bar'), value: document.getElementById('au43-value') },
     };
 
+    // ── DOM refs: Settings ────────────────────────────────────────
+
+    const settingsBtn = document.getElementById('settings-btn');
+    const settingsPanel = document.getElementById('settings-panel');
+    const resetSettingsBtn = document.getElementById('reset-settings-btn');
+
+    const settingInputs = {
+        au4Sensitivity:     { input: 'set-au4-sens',    display: 'val-au4-sens' },
+        au67Sensitivity:    { input: 'set-au67-sens',   display: 'val-au67-sens' },
+        au910Sensitivity:   { input: 'set-au910-sens',  display: 'val-au910-sens' },
+        au43Threshold:      { input: 'set-au43-thresh', display: 'val-au43-thresh' },
+        au43Sensitivity:    { input: 'set-au43-sens',   display: 'val-au43-sens' },
+        talkingSuppression: { input: 'set-talk-supp',   display: 'val-talk-supp' },
+        smoothingSize:      { input: 'set-smooth-win',  display: 'val-smooth-win' },
+        sampleIntervalMs:   { input: 'set-sample-int',  display: 'val-sample-int' },
+    };
+
     // ── Initialize engine, gauge & chart ──────────────────────────
 
-    const engine = new PainEngine({ smoothingSize: 8 });
+    const engine = new PainEngine(settings);
     const gauge = new PainGauge('gauge');
     const chart = new SessionChart('session-chart');
+
+    // ── Settings panel logic ─────────────────────────────────────
+
+    settingsBtn.addEventListener('click', () => {
+        settingsPanel.classList.toggle('hidden');
+        settingsBtn.classList.toggle('active');
+    });
+
+    function applySettingsToUI(s) {
+        for (const [key, { input, display }] of Object.entries(settingInputs)) {
+            document.getElementById(input).value = s[key];
+            document.getElementById(display).textContent = s[key];
+        }
+    }
+
+    function bindSettingInputs() {
+        for (const [key, { input, display }] of Object.entries(settingInputs)) {
+            const el = document.getElementById(input);
+            const valEl = document.getElementById(display);
+            el.addEventListener('input', () => {
+                const val = parseFloat(el.value);
+                valEl.textContent = val;
+                settings[key] = val;
+
+                // Apply to engine
+                if (key === 'smoothingSize') {
+                    engine.smoothingSize = val;
+                } else if (key === 'sampleIntervalMs') {
+                    SAMPLE_INTERVAL_MS = val;
+                } else {
+                    engine[key] = val;
+                }
+
+                saveSettings(settings);
+            });
+        }
+    }
+
+    applySettingsToUI(settings);
+    bindSettingInputs();
+
+    resetSettingsBtn.addEventListener('click', () => {
+        settings = { ...DEFAULTS };
+        applySettingsToUI(settings);
+        // Apply all to engine
+        for (const key of Object.keys(DEFAULTS)) {
+            if (key === 'sampleIntervalMs') {
+                SAMPLE_INTERVAL_MS = DEFAULTS[key];
+            } else {
+                engine[key] = DEFAULTS[key];
+            }
+        }
+        saveSettings(settings);
+    });
 
     // ── FPS tracking ──────────────────────────────────────────────
 
@@ -123,10 +221,10 @@
         isCalibrating = false;
         calibrateBtn.textContent = 'Calibrated!';
         const level = engine.baselinePainLevel;
-        calibInstructions.innerHTML = `Calibrated at pain level <strong>${level}</strong>. Entering session...`;
+        calibInstructions.innerHTML = `Calibrated at pain level <strong>${level}</strong>. Returning...`;
         calibProgress.classList.add('hidden');
 
-        // Move video + overlay to main screen after short delay
+        // Move video back to main screen after short delay
         setTimeout(() => {
             moveVideoToMain();
             showScreen(screenMain);
@@ -138,12 +236,14 @@
     function moveVideoToMain() {
         mainVideoContainer.appendChild(videoEl);
         mainVideoContainer.appendChild(overlayEl);
-        // Re-create the no-face warning in main
-        const warning = document.createElement('div');
-        warning.id = 'no-face-warning-main';
-        warning.className = 'hidden';
-        warning.textContent = 'No face detected';
-        mainVideoContainer.appendChild(warning);
+        // Ensure no-face warning exists in main
+        if (!document.getElementById('no-face-warning-main')) {
+            const warning = document.createElement('div');
+            warning.id = 'no-face-warning-main';
+            warning.className = 'hidden';
+            warning.textContent = 'No face detected';
+            mainVideoContainer.appendChild(warning);
+        }
     }
 
     function moveVideoToCalib() {
@@ -152,20 +252,20 @@
         calibArea.insertBefore(overlayEl, videoEl.nextSibling);
     }
 
-    // ── Recalibrate ───────────────────────────────────────────────
+    // ── Calibrate (go to calibration screen) ─────────────────────
 
     recalibrateBtn.addEventListener('click', () => {
         // Stop any active session
         if (sessionActive) {
             endSession();
         }
-        // Move video back to calibration screen
+        // Move video to calibration screen
         moveVideoToCalib();
         // Reset calibration UI
         calibrateBtn.disabled = false;
         calibrateBtn.textContent = 'Calibrate';
         calibInstructions.innerHTML = 'What is the patient\'s <strong>current pain level</strong>?';
-        calibStatus.textContent = 'Ready to calibrate';
+        calibStatus.textContent = 'Camera ready. Click Calibrate when ready.';
         selectPainLevel(0);
         engine.resetCalibration();
         showScreen(screenCalib);
@@ -216,7 +316,6 @@
     // ── Session chart sampling ────────────────────────────────────
 
     let lastSampleTime = 0;
-    const SAMPLE_INTERVAL_MS = 500;
 
     function maybeRecordSample(score) {
         if (!sessionActive) return;
@@ -327,8 +426,6 @@
     // ── Start camera ──────────────────────────────────────────────
 
     async function startCamera() {
-        calibStatus.textContent = 'Starting camera...';
-
         try {
             const camera = new Camera(videoEl, {
                 onFrame: async () => {
@@ -339,10 +436,7 @@
             });
 
             await camera.start();
-            calibStatus.textContent = 'Camera ready. Click Calibrate when ready.';
-            calibrateBtn.disabled = false;
         } catch (err) {
-            calibStatus.textContent = `Camera error: ${err.message}`;
             console.error('Camera start failed:', err);
         }
     }

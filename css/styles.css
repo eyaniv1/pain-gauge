@@ -595,6 +595,56 @@ footer {
     gap: 4px;
 }
 
+/* ── Settings Panel ──────────────────────────────────────── */
+
+.settings-panel {
+    background: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    padding: 12px 24px;
+}
+
+.settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 6px 24px;
+}
+
+.setting-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.setting-item label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    min-width: 130px;
+    flex-shrink: 0;
+}
+
+.setting-item input[type="range"] {
+    flex: 1;
+    min-width: 80px;
+}
+
+.setting-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: #333;
+    min-width: 36px;
+    text-align: right;
+}
+
+#reset-settings-btn {
+    margin-top: 8px;
+}
+
+#settings-btn.active {
+    background: #e0e0e0;
+    border-color: #bbb;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 
 @media (max-width: 900px) {
@@ -648,6 +698,14 @@ footer {
     footer {
         flex-direction: column;
         gap: 8px;
+        padding: 10px 16px;
+    }
+
+    .settings-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .settings-panel {
         padding: 10px 16px;
     }
 }

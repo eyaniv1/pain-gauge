@@ -21,6 +21,14 @@ class PainEngine {
         this.smoothingWindow = [];
         this.smoothingSize = options.smoothingSize || 10;
         this.lastResult = null;
+
+        // Tunable sensitivity parameters
+        this.au4Sensitivity = options.au4Sensitivity ?? 12;
+        this.au67Sensitivity = options.au67Sensitivity ?? 8;
+        this.au910Sensitivity = options.au910Sensitivity ?? 12;
+        this.au43Threshold = options.au43Threshold ?? 0.55;
+        this.au43Sensitivity = options.au43Sensitivity ?? 11;
+        this.talkingSuppression = options.talkingSuppression ?? 0.5;
     }
 
     // ── MediaPipe Face Mesh landmark indices ──────────────────────
@@ -188,27 +196,27 @@ class PainEngine {
 
         // AU4: brow lowers → distance decreases
         const au4Dev = Math.max(0, (base.au4 - rawAU4) / base.au4);
-        const au4Score = Math.min(5, au4Dev * 12);
+        const au4Score = Math.min(5, au4Dev * this.au4Sensitivity);
 
         // AU6/7: eyes tighten → EAR decreases
         const earDev = Math.max(0, (base.ear - rawEAR) / base.ear);
-        const au6_7Score = Math.min(5, earDev * 8);
+        const au6_7Score = Math.min(5, earDev * this.au67Sensitivity);
 
         // AU9/10: nose wrinkle / lip raise → nose-lip distance decreases
         const au910Dev = Math.max(0, (base.au910 - rawAU910) / base.au910);
-        const au9_10Score = Math.min(5, au910Dev * 12);
+        const au9_10Score = Math.min(5, au910Dev * this.au910Sensitivity);
 
         // AU43: eye closure → EAR near zero
         let au43Score = 0;
-        if (earDev > 0.55) {
-            au43Score = Math.min(5, (earDev - 0.55) * 11);
+        if (earDev > this.au43Threshold) {
+            au43Score = Math.min(5, (earDev - this.au43Threshold) * this.au43Sensitivity);
         }
 
         // ── Suppress talking false positives ──
         // When mouth is wide open (talking), reduce AU9/10 contribution
         const mouthDev = (mouthOpen - (base.mouthOpen || 0.01)) / 0.05;
-        const talkingSuppression = Math.max(0, Math.min(1, 1 - mouthDev * 0.5));
-        const adjustedAU910 = au9_10Score * talkingSuppression;
+        const talkSuppression = Math.max(0, Math.min(1, 1 - mouthDev * this.talkingSuppression));
+        const adjustedAU910 = au9_10Score * talkSuppression;
 
         // ── PSPI formula ──
         const pspi = au4Score + Math.max(au6_7Score, au6_7Score) + Math.max(adjustedAU910, adjustedAU910) + au43Score;
