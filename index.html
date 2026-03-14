@@ -25,8 +25,19 @@
             <div class="calib-controls">
                 <h1>Pain Gauge</h1>
                 <p class="calib-instructions" id="calib-instructions">
-                    Position your face in the frame and keep a <strong>neutral, relaxed expression</strong>.
+                    What is the patient's <strong>current pain level</strong>?
                 </p>
+
+                <!-- Pain level selector -->
+                <div class="pain-selector" id="pain-selector">
+                    <input type="range" id="baseline-pain" min="0" max="10" step="1" value="0">
+                    <div class="pain-selector-labels">
+                        <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span>
+                        <span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+                    </div>
+                    <div class="pain-selector-value" id="baseline-pain-value">0 — No Pain</div>
+                </div>
+
                 <div class="calib-progress hidden" id="calib-progress">
                     <div class="calib-progress-bar" id="calib-progress-bar"></div>
                 </div>
@@ -44,7 +55,9 @@
     <div class="screen" id="screen-main">
         <header>
             <h1>Pain Gauge</h1>
-            <span class="subtitle">Real-Time Pain Monitor</span>
+            <div class="header-spacer"></div>
+            <button type="button" class="btn btn-start btn-small" id="start-btn">Start Session</button>
+            <button type="button" class="btn btn-end btn-small hidden" id="end-btn">End Session</button>
             <button type="button" class="btn btn-small" id="recalibrate-btn">Recalibrate</button>
         </header>
 
@@ -97,10 +110,6 @@
         </main>
 
         <footer>
-            <div class="session-controls">
-                <button type="button" class="btn btn-start" id="start-btn">Start Session</button>
-                <button type="button" class="btn btn-end hidden" id="end-btn">End Session</button>
-            </div>
             <div class="status-bar">
                 <span id="session-status">Ready</span>
                 <span id="session-timer"></span>

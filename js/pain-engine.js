@@ -16,6 +16,7 @@
 class PainEngine {
     constructor(options = {}) {
         this.baseline = null;
+        this.baselinePainLevel = 0; // patient's reported pain at calibration (0-10)
         this.currentScore = 0;
         this.smoothingWindow = [];
         this.smoothingSize = options.smoothingSize || 10;
@@ -145,6 +146,7 @@ class PainEngine {
 
     resetCalibration() {
         this.baseline = null;
+        this.baselinePainLevel = 0;
         this.smoothingWindow = [];
         this.currentScore = 0;
     }
@@ -211,8 +213,13 @@ class PainEngine {
         // ── PSPI formula ──
         const pspi = au4Score + Math.max(au6_7Score, au6_7Score) + Math.max(adjustedAU910, adjustedAU910) + au43Score;
 
-        // Normalize to 0–10
-        const rawPain = Math.min(10, (pspi / 15) * 10);
+        // Normalize PSPI deviation to 0–10 range
+        const deviationPain = Math.min(10, (pspi / 15) * 10);
+
+        // Add baseline pain level: calibrated face = baselinePainLevel,
+        // deviations above it add to the score, capped at 10
+        const remainingRange = 10 - this.baselinePainLevel;
+        const rawPain = Math.min(10, this.baselinePainLevel + (deviationPain / 10) * remainingRange);
 
         // Temporal smoothing (exponential moving average)
         this.smoothingWindow.push(rawPain);
