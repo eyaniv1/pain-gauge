@@ -32,11 +32,13 @@ class SessionChart {
 
     stopRecording() {
         this.isRecording = false;
+        this.stoppedElapsed = this.getElapsedTime();
     }
 
     resetRecording() {
         this.samples = [];
         this.startTime = null;
+        this.stoppedElapsed = null;
         this.isRecording = false;
     }
 
@@ -48,6 +50,7 @@ class SessionChart {
 
     getElapsedTime() {
         if (!this.startTime) return 0;
+        if (!this.isRecording && this.stoppedElapsed != null) return this.stoppedElapsed;
         return (performance.now() - this.startTime) / 1000;
     }
 
