@@ -43,6 +43,9 @@
 
     let sessionActive = false;
     let SAMPLE_INTERVAL_MS = settings.sampleIntervalMs;
+    let inputMode = 'camera'; // 'camera' or 'video'
+    let cameraInstance = null;
+    let videoLoopId = null;
 
     // ── Screens ───────────────────────────────────────────────────
 
@@ -101,6 +104,12 @@
         smoothingSize:      { input: 'set-smooth-win',  display: 'val-smooth-win' },
         sampleIntervalMs:   { input: 'set-sample-int',  display: 'val-sample-int' },
     };
+
+    // ── DOM refs: Video input ────────────────────────────────────
+
+    const loadVideoBtn = document.getElementById('load-video-btn');
+    const backToCameraBtn = document.getElementById('back-to-camera-btn');
+    const videoFileInput = document.getElementById('video-file-input');
 
     // ── Initialize engine, gauge & chart ──────────────────────────
 
@@ -426,8 +435,9 @@
     // ── Start camera ──────────────────────────────────────────────
 
     async function startCamera() {
+        stopVideoLoop();
         try {
-            const camera = new Camera(videoEl, {
+            cameraInstance = new Camera(videoEl, {
                 onFrame: async () => {
                     await faceMesh.send({ image: videoEl });
                 },
@@ -435,9 +445,77 @@
                 height: 480,
             });
 
-            await camera.start();
+            await cameraInstance.start();
+            inputMode = 'camera';
+            loadVideoBtn.classList.remove('hidden');
+            backToCameraBtn.classList.add('hidden');
+            videoEl.style.transform = '';
+            overlayEl.style.transform = '';
         } catch (err) {
             console.error('Camera start failed:', err);
+        }
+    }
+
+    // ── Video file input ─────────────────────────────────────────
+
+    loadVideoBtn.addEventListener('click', () => {
+        videoFileInput.click();
+    });
+
+    backToCameraBtn.addEventListener('click', () => {
+        startCamera();
+    });
+
+    videoFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        loadVideoFile(file);
+        // Reset so the same file can be re-selected
+        videoFileInput.value = '';
+    });
+
+    function loadVideoFile(file) {
+        // Stop camera if running
+        if (cameraInstance) {
+            cameraInstance.stop();
+            cameraInstance = null;
+        }
+        stopVideoLoop();
+
+        const url = URL.createObjectURL(file);
+        videoEl.srcObject = null;
+        videoEl.src = url;
+        videoEl.muted = true;
+        videoEl.loop = true;
+        // Don't mirror file videos (they're not selfie-cam)
+        videoEl.style.transform = 'none';
+        overlayEl.style.transform = 'none';
+
+        videoEl.addEventListener('loadeddata', function onLoaded() {
+            videoEl.removeEventListener('loadeddata', onLoaded);
+            videoEl.play();
+            inputMode = 'video';
+            loadVideoBtn.classList.add('hidden');
+            backToCameraBtn.classList.remove('hidden');
+            startVideoLoop();
+        });
+    }
+
+    function startVideoLoop() {
+        async function loop() {
+            if (inputMode !== 'video') return;
+            if (!videoEl.paused && !videoEl.ended && videoEl.readyState >= 2) {
+                await faceMesh.send({ image: videoEl });
+            }
+            videoLoopId = requestAnimationFrame(loop);
+        }
+        loop();
+    }
+
+    function stopVideoLoop() {
+        if (videoLoopId) {
+            cancelAnimationFrame(videoLoopId);
+            videoLoopId = null;
         }
     }
 
