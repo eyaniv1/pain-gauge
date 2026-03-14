@@ -1,24 +1,53 @@
 /**
  * Main Application
  *
- * Wires together: Camera → MediaPipe FaceMesh → PainEngine → PainGauge
- * Tab switching is handled inline in index.html for reliability.
+ * Flow: Calibration Screen → Main Screen (Start/End session)
+ *
+ * - Calibration: full-screen camera, capture neutral face baseline
+ * - Main: gauge + camera/history toggle, session start/end controls
+ * - Start: begins measuring and recording pain scores
+ * - End: stops recording, graph remains visible
+ * - Next Start: clears previous graph, begins new session
  */
 
 (function () {
     'use strict';
 
-    // ── DOM refs ──────────────────────────────────────────────────
+    // ── State ─────────────────────────────────────────────────────
+
+    let sessionActive = false;
+
+    // ── Screens ───────────────────────────────────────────────────
+
+    const screenCalib = document.getElementById('screen-calibration');
+    const screenMain = document.getElementById('screen-main');
+
+    function showScreen(screen) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        screen.classList.add('active');
+    }
+
+    // ── DOM refs: Calibration ─────────────────────────────────────
 
     const videoEl = document.getElementById('webcam');
     const overlayEl = document.getElementById('overlay');
     const overlayCtx = overlayEl.getContext('2d');
     const noFaceWarning = document.getElementById('no-face-warning');
     const calibrateBtn = document.getElementById('calibrate-btn');
-    const resetBtn = document.getElementById('reset-btn');
-    const statusEl = document.getElementById('status');
+    const calibInstructions = document.getElementById('calib-instructions');
+    const calibProgress = document.getElementById('calib-progress');
+    const calibProgressBar = document.getElementById('calib-progress-bar');
+    const calibStatus = document.getElementById('calib-status');
+
+    // ── DOM refs: Main ────────────────────────────────────────────
+
+    const recalibrateBtn = document.getElementById('recalibrate-btn');
+    const startBtn = document.getElementById('start-btn');
+    const endBtn = document.getElementById('end-btn');
+    const sessionStatusEl = document.getElementById('session-status');
+    const sessionTimerEl = document.getElementById('session-timer');
     const fpsEl = document.getElementById('fps');
-    const calibStatusEl = document.getElementById('calibration-status');
+    const mainVideoContainer = document.getElementById('main-video-container');
 
     // AU bar elements
     const auBars = {
@@ -50,11 +79,31 @@
         frameCount++;
     }
 
+    // ── Session timer ─────────────────────────────────────────────
+
+    let sessionStartTime = null;
+    let timerInterval = null;
+
+    function startTimer() {
+        sessionStartTime = Date.now();
+        timerInterval = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+            const m = Math.floor(elapsed / 60);
+            const s = elapsed % 60;
+            sessionTimerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+        }, 1000);
+    }
+
+    function stopTimer() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
+
     // ── Calibration ───────────────────────────────────────────────
 
     let calibrationFrames = 0;
     let isCalibrating = false;
-    const CALIBRATION_FRAME_COUNT = 30; // ~1 second of frames
+    const CALIBRATION_FRAME_COUNT = 45; // ~1.5 seconds
 
     calibrateBtn.addEventListener('click', () => {
         isCalibrating = true;
@@ -62,24 +111,110 @@
         engine.resetCalibration();
         calibrateBtn.disabled = true;
         calibrateBtn.textContent = 'Hold still...';
-        statusEl.textContent = 'Calibrating — keep a neutral face...';
+        calibInstructions.innerHTML = 'Keep your face <strong>still and relaxed</strong>...';
+        calibProgress.classList.remove('hidden');
+        calibProgressBar.style.width = '0%';
     });
 
-    resetBtn.addEventListener('click', () => {
+    function onCalibrationComplete() {
+        isCalibrating = false;
+        calibrateBtn.textContent = 'Calibrated!';
+        calibInstructions.innerHTML = 'Calibration complete. Entering session view...';
+        calibProgress.classList.add('hidden');
+
+        // Move video + overlay to main screen after short delay
+        setTimeout(() => {
+            moveVideoToMain();
+            showScreen(screenMain);
+        }, 800);
+    }
+
+    // ── Move video element between screens ────────────────────────
+
+    function moveVideoToMain() {
+        mainVideoContainer.appendChild(videoEl);
+        mainVideoContainer.appendChild(overlayEl);
+        // Re-create the no-face warning in main
+        const warning = document.createElement('div');
+        warning.id = 'no-face-warning-main';
+        warning.className = 'hidden';
+        warning.textContent = 'No face detected';
+        mainVideoContainer.appendChild(warning);
+    }
+
+    function moveVideoToCalib() {
+        const calibArea = document.querySelector('.calib-video-area');
+        calibArea.insertBefore(videoEl, calibArea.firstChild);
+        calibArea.insertBefore(overlayEl, videoEl.nextSibling);
+    }
+
+    // ── Recalibrate ───────────────────────────────────────────────
+
+    recalibrateBtn.addEventListener('click', () => {
+        // Stop any active session
+        if (sessionActive) {
+            endSession();
+        }
+        // Move video back to calibration screen
+        moveVideoToCalib();
+        // Reset calibration UI
+        calibrateBtn.disabled = false;
+        calibrateBtn.textContent = 'Calibrate';
+        calibInstructions.innerHTML = 'Position your face in the frame and keep a <strong>neutral, relaxed expression</strong>.';
+        calibStatus.textContent = 'Ready to calibrate';
         engine.resetCalibration();
-        chart.resetRecording();
-        calibStatusEl.textContent = 'Uncalibrated (using defaults)';
-        calibStatusEl.classList.remove('calibrated');
-        gauge.setScore(0);
+        showScreen(screenCalib);
     });
+
+    // ── Session Start / End ───────────────────────────────────────
+
+    startBtn.addEventListener('click', () => {
+        startSession();
+    });
+
+    endBtn.addEventListener('click', () => {
+        endSession();
+    });
+
+    function startSession() {
+        // Clear previous session data
+        chart.resetRecording();
+        chart.startRecording();
+        engine.smoothingWindow = [];
+
+        sessionActive = true;
+        startBtn.classList.add('hidden');
+        endBtn.classList.remove('hidden');
+        sessionStatusEl.textContent = 'Recording';
+        sessionStatusEl.style.color = '#c0392b';
+        startTimer();
+
+        // Switch to camera view
+        switchView(0);
+    }
+
+    function endSession() {
+        sessionActive = false;
+        chart.stopRecording();
+        stopTimer();
+
+        endBtn.classList.add('hidden');
+        startBtn.classList.remove('hidden');
+        startBtn.textContent = 'New Session';
+        sessionStatusEl.textContent = 'Session ended';
+        sessionStatusEl.style.color = '#888';
+
+        // Switch to history view to show results
+        switchView(1);
+    }
 
     // ── Session chart sampling ────────────────────────────────────
-    // Sample at ~2 Hz to keep the chart readable (not every video frame)
 
     let lastSampleTime = 0;
     const SAMPLE_INTERVAL_MS = 500;
 
     function maybeRecordSample(score) {
+        if (!sessionActive) return;
         const now = performance.now();
         if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
             chart.addSample(score);
@@ -114,69 +249,52 @@
         overlayEl.height = results.image.height;
         overlayCtx.clearRect(0, 0, overlayEl.width, overlayEl.height);
 
-        if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
-            noFaceWarning.classList.remove('hidden');
-            statusEl.textContent = 'No face detected';
-            return;
-        }
+        const hasFace = results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0;
 
-        noFaceWarning.classList.add('hidden');
+        // Update face warning
+        noFaceWarning.classList.toggle('hidden', hasFace);
+        const mainWarning = document.getElementById('no-face-warning-main');
+        if (mainWarning) mainWarning.classList.toggle('hidden', hasFace);
+
+        if (!hasFace) return;
+
         const landmarks = results.multiFaceLandmarks[0];
 
-        // Draw subtle face mesh on overlay
+        // Draw face mesh on overlay
         drawFaceMesh(landmarks);
 
         // Calibration mode
         if (isCalibrating) {
             engine.calibrate(landmarks);
             calibrationFrames++;
+            const pct = Math.round((calibrationFrames / CALIBRATION_FRAME_COUNT) * 100);
+            calibProgressBar.style.width = pct + '%';
 
             if (calibrationFrames >= CALIBRATION_FRAME_COUNT) {
-                isCalibrating = false;
-                calibrateBtn.disabled = false;
-                calibrateBtn.textContent = 'Calibrate Neutral Face';
-                calibStatusEl.textContent = `Calibrated (${engine.baseline.samples} samples)`;
-                calibStatusEl.classList.add('calibrated');
-                statusEl.textContent = 'Tracking face';
-
-                // Start session recording after calibration
-                chart.startRecording();
+                onCalibrationComplete();
             }
             return;
         }
 
-        // Score pain
+        // Score pain (always process for live gauge, but only record in session)
         const result = engine.process(landmarks);
-
-        // Update gauge
         gauge.setScore(result.score);
-
-        // Update AU bars
         updateAUBars(result.aus);
-
-        // Record to session chart
         maybeRecordSample(result.score);
-
-        statusEl.textContent = 'Tracking face';
     }
 
     // ── Draw face mesh overlay ────────────────────────────────────
 
     function drawFaceMesh(landmarks) {
-        // Draw the tesselation (subtle wireframe)
         drawConnectors(overlayCtx, landmarks, FACEMESH_TESSELATION, {
             color: 'rgba(100, 180, 255, 0.15)',
             lineWidth: 0.5,
         });
 
-        // Highlight pain-relevant landmarks
         const painLandmarkIndices = [
-            // Brows
             55, 285, 65, 295,
-            // Eyes
             33, 160, 158, 133, 153, 144,
             263, 387, 385, 362, 380, 373,
-            // Nose / lip
             4, 13, 168,
         ];
 
@@ -184,13 +302,7 @@
         for (const idx of painLandmarkIndices) {
             const lm = landmarks[idx];
             overlayCtx.beginPath();
-            overlayCtx.arc(
-                lm.x * overlayEl.width,
-                lm.y * overlayEl.height,
-                2.5,
-                0,
-                2 * Math.PI
-            );
+            overlayCtx.arc(lm.x * overlayEl.width, lm.y * overlayEl.height, 2.5, 0, 2 * Math.PI);
             overlayCtx.fill();
         }
     }
@@ -210,7 +322,7 @@
     // ── Start camera ──────────────────────────────────────────────
 
     async function startCamera() {
-        statusEl.textContent = 'Starting camera...';
+        calibStatus.textContent = 'Starting camera...';
 
         try {
             const camera = new Camera(videoEl, {
@@ -222,10 +334,10 @@
             });
 
             await camera.start();
-            statusEl.textContent = 'Loading face mesh model...';
+            calibStatus.textContent = 'Camera ready. Click Calibrate when ready.';
             calibrateBtn.disabled = false;
         } catch (err) {
-            statusEl.textContent = `Camera error: ${err.message}`;
+            calibStatus.textContent = `Camera error: ${err.message}`;
             console.error('Camera start failed:', err);
         }
     }

@@ -11,9 +11,216 @@ body {
     background: #f5f5f7;
     color: #1d1d1f;
     height: 100vh;
+    overflow: hidden;
+}
+
+/* ── Screens ─────────────────────────────────────────────── */
+
+.screen {
+    display: none;
+    width: 100%;
+    height: 100%;
+}
+
+.screen.active {
+    display: flex;
+}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+
+.btn {
+    padding: 10px 20px;
+    border: 1px solid #ddd;
+    border-radius: 10px;
+    background: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+    background: #f0f0f0;
+    border-color: #ccc;
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: #c0392b;
+    color: #fff;
+    border-color: #a93226;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #a93226;
+}
+
+.btn-large {
+    padding: 14px 40px;
+    font-size: 18px;
+    border-radius: 12px;
+}
+
+.btn-small {
+    padding: 6px 14px;
+    font-size: 12px;
+    border-radius: 6px;
+}
+
+.btn-start {
+    background: #27ae60;
+    color: #fff;
+    border-color: #229954;
+    padding: 10px 28px;
+    font-size: 15px;
+}
+
+.btn-start:hover:not(:disabled) {
+    background: #229954;
+}
+
+.btn-end {
+    background: #c0392b;
+    color: #fff;
+    border-color: #a93226;
+    padding: 10px 28px;
+    font-size: 15px;
+}
+
+.btn-end:hover:not(:disabled) {
+    background: #a93226;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ============================================ */
+/* SCREEN 1: Calibration                        */
+/* ============================================ */
+
+#screen-calibration {
+    align-items: center;
+    justify-content: center;
+    background: #1a1a2e;
+}
+
+.calib-layout {
     display: flex;
     flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    width: 100%;
+    max-width: 600px;
+    padding: 24px;
+}
+
+.calib-video-area {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4/3;
+    border-radius: 16px;
     overflow: hidden;
+    background: #000;
+}
+
+.calib-video-area video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
+}
+
+.calib-video-area canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    transform: scaleX(-1);
+}
+
+.calib-video-area #no-face-warning {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: #ff6b6b;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 5;
+}
+
+/* Face guide oval */
+.face-guide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40%;
+    height: 65%;
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.calib-controls {
+    text-align: center;
+    color: #fff;
+}
+
+.calib-controls h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: #e74c3c;
+    margin-bottom: 8px;
+}
+
+.calib-instructions {
+    font-size: 15px;
+    color: #ccc;
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.calib-progress {
+    width: 100%;
+    max-width: 300px;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    margin: 0 auto 16px;
+    overflow: hidden;
+}
+
+.calib-progress-bar {
+    height: 100%;
+    background: #27ae60;
+    border-radius: 3px;
+    transition: width 0.1s linear;
+}
+
+.calib-status {
+    font-size: 13px;
+    color: #888;
+    margin-top: 12px;
+}
+
+/* ============================================ */
+/* SCREEN 2: Main                               */
+/* ============================================ */
+
+#screen-main {
+    flex-direction: column;
 }
 
 /* ── Header ──────────────────────────────────────────────── */
@@ -22,21 +229,22 @@ header {
     flex-shrink: 0;
     background: #fff;
     border-bottom: 1px solid #e0e0e0;
-    padding: 12px 24px;
+    padding: 10px 24px;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 12px;
 }
 
 header h1 {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: #c0392b;
 }
 
 header .subtitle {
-    font-size: 14px;
+    font-size: 13px;
     color: #888;
+    flex: 1;
 }
 
 /* ── Main Layout ─────────────────────────────────────────── */
@@ -45,14 +253,14 @@ main {
     flex: 1;
     min-height: 0;
     display: flex;
-    gap: 24px;
-    padding: 24px;
+    gap: 20px;
+    padding: 16px 20px;
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
 }
 
-/* ── Left Panel (Camera / History) ────────────────────────── */
+/* ── Left Panel ──────────────────────────────────────────── */
 
 .left-panel {
     flex: 1;
@@ -71,10 +279,10 @@ main {
 
 .view-tab {
     flex: 1;
-    padding: 10px 16px;
+    padding: 8px 16px;
     border: 1px solid #ddd;
     background: #f0f0f0;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     color: #666;
     cursor: pointer;
@@ -83,24 +291,23 @@ main {
 }
 
 .view-tab:first-child {
-    border-radius: 12px 0 0 0;
+    border-radius: 10px 0 0 0;
 }
 
 .view-tab:last-child {
-    border-radius: 0 12px 0 0;
+    border-radius: 0 10px 0 0;
 }
 
 .view-tab.active {
     background: #fff;
     color: #c0392b;
-    border-bottom-color: transparent;
 }
 
 .view-tab:hover:not(.active) {
     background: #e8e8e8;
 }
 
-/* ── View Panels (show/hide) ─────────────────────────────── */
+/* ── View Panels ─────────────────────────────────────────── */
 
 .panels-container {
     flex: 1;
@@ -108,7 +315,7 @@ main {
     position: relative;
     border: 1px solid #ddd;
     border-top: none;
-    border-radius: 0 0 12px 12px;
+    border-radius: 0 0 10px 10px;
     overflow: hidden;
 }
 
@@ -143,7 +350,7 @@ main {
     height: 100%;
 }
 
-/* ── Video Panel ─────────────────────────────────────────── */
+/* ── Video Container (in main screen) ────────────────────── */
 
 .video-container {
     position: relative;
@@ -157,7 +364,7 @@ main {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transform: scaleX(-1); /* mirror */
+    transform: scaleX(-1);
 }
 
 .video-container canvas {
@@ -166,35 +373,32 @@ main {
     left: 0;
     width: 100%;
     height: 100%;
-    transform: scaleX(-1); /* mirror to match video */
+    transform: scaleX(-1);
 }
 
-#no-face-warning {
+#no-face-warning-main {
     position: absolute;
-    top: 50%;
+    top: 12px;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     background: rgba(0, 0, 0, 0.7);
     color: #ff6b6b;
-    padding: 12px 24px;
+    padding: 8px 20px;
     border-radius: 8px;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
-}
-
-.hidden {
-    display: none !important;
+    z-index: 5;
 }
 
 /* ── Gauge Panel ─────────────────────────────────────────── */
 
 .gauge-panel {
-    width: 420px;
+    width: 400px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    gap: 16px;
     min-height: 0;
     overflow-y: auto;
 }
@@ -202,7 +406,7 @@ main {
 #gauge {
     flex-shrink: 0;
     background: #fff;
-    border-radius: 12px;
+    border-radius: 10px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
@@ -211,26 +415,26 @@ main {
 .au-breakdown {
     width: 100%;
     background: #fff;
-    border-radius: 12px;
-    padding: 16px 20px;
+    border-radius: 10px;
+    padding: 14px 18px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     flex-shrink: 0;
 }
 
 .au-breakdown h3 {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #888;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .au-bar {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .au-bar:last-child {
@@ -277,58 +481,26 @@ main {
     flex-shrink: 0;
 }
 
-/* ── Footer / Controls ───────────────────────────────────── */
+/* ── Footer / Session Controls ───────────────────────────── */
 
 footer {
     flex-shrink: 0;
     background: #fff;
     border-top: 1px solid #e0e0e0;
-    padding: 12px 24px;
+    padding: 10px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.controls {
+.session-controls {
     display: flex;
     gap: 8px;
 }
 
-.controls button {
-    padding: 8px 16px;
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    background: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    color: #333;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.controls button:hover:not(:disabled) {
-    background: #f0f0f0;
-    border-color: #ccc;
-}
-
-.controls button:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
-
-#calibrate-btn {
-    background: #c0392b;
-    color: #fff;
-    border-color: #a93226;
-}
-
-#calibrate-btn:hover:not(:disabled) {
-    background: #a93226;
-}
-
 .status-bar {
     display: flex;
-    gap: 20px;
+    gap: 16px;
     font-size: 12px;
     color: #888;
 }
@@ -339,17 +511,25 @@ footer {
     gap: 4px;
 }
 
-#calibration-status {
-    color: #e67e22;
-}
-
-#calibration-status.calibrated {
-    color: #27ae60;
-}
-
 /* ── Responsive ──────────────────────────────────────────── */
 
 @media (max-width: 900px) {
+    /* Calibration */
+    .calib-layout {
+        padding: 16px;
+        gap: 16px;
+    }
+
+    .calib-controls h1 {
+        font-size: 22px;
+    }
+
+    /* Main */
+    #screen-main {
+        height: auto;
+        min-height: 100vh;
+    }
+
     body {
         height: auto;
         min-height: 100vh;
@@ -359,8 +539,8 @@ footer {
     main {
         flex-direction: column;
         overflow: visible;
-        padding: 12px;
-        gap: 12px;
+        padding: 10px;
+        gap: 10px;
     }
 
     .left-panel {
@@ -369,7 +549,7 @@ footer {
 
     .panels-container {
         flex: none;
-        height: 56vw; /* roughly 4:3 aspect based on viewport width */
+        height: 56vw;
     }
 
     .gauge-panel {
@@ -385,10 +565,5 @@ footer {
         flex-direction: column;
         gap: 8px;
         padding: 10px 16px;
-    }
-
-    .status-bar {
-        gap: 10px;
-        font-size: 11px;
     }
 }

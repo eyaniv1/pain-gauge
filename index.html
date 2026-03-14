@@ -7,85 +7,119 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-    <header>
-        <h1>Pain Gauge</h1>
-        <span class="subtitle">Real-Time Pain Monitor</span>
-    </header>
 
-    <main>
-        <section class="left-panel">
-            <!-- Toggle tabs -->
-            <div class="view-tabs">
-                <button type="button" class="view-tab active" id="tab-camera" onclick="switchView(0)">Camera</button>
-                <button type="button" class="view-tab" id="tab-history" onclick="switchView(1)">History</button>
+    <!-- ============================================ -->
+    <!-- SCREEN 1: Calibration                        -->
+    <!-- ============================================ -->
+    <div class="screen active" id="screen-calibration">
+        <div class="calib-layout">
+            <div class="calib-video-area">
+                <video id="webcam" playsinline></video>
+                <canvas id="overlay"></canvas>
+                <div id="no-face-warning" class="hidden">No face detected</div>
+
+                <!-- Face guide oval -->
+                <div class="face-guide"></div>
             </div>
 
-            <!-- View panels (only one visible at a time) -->
-            <div class="panels-container">
-                <div class="view-panel active" id="panel-camera">
-                    <div class="video-container">
-                        <video id="webcam" playsinline></video>
-                        <canvas id="overlay"></canvas>
-                        <div id="no-face-warning" class="hidden">No face detected</div>
+            <div class="calib-controls">
+                <h1>Pain Gauge</h1>
+                <p class="calib-instructions" id="calib-instructions">
+                    Position your face in the frame and keep a <strong>neutral, relaxed expression</strong>.
+                </p>
+                <div class="calib-progress hidden" id="calib-progress">
+                    <div class="calib-progress-bar" id="calib-progress-bar"></div>
+                </div>
+                <button type="button" class="btn btn-primary btn-large" id="calibrate-btn" disabled>
+                    Calibrate
+                </button>
+                <p class="calib-status" id="calib-status">Starting camera...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SCREEN 2: Main (Gauge + Camera/History)      -->
+    <!-- ============================================ -->
+    <div class="screen" id="screen-main">
+        <header>
+            <h1>Pain Gauge</h1>
+            <span class="subtitle">Real-Time Pain Monitor</span>
+            <button type="button" class="btn btn-small" id="recalibrate-btn">Recalibrate</button>
+        </header>
+
+        <main>
+            <section class="left-panel">
+                <div class="view-tabs">
+                    <button type="button" class="view-tab active" onclick="switchView(0)">Camera</button>
+                    <button type="button" class="view-tab" onclick="switchView(1)">History</button>
+                </div>
+
+                <div class="panels-container">
+                    <div class="view-panel active" id="panel-camera">
+                        <div class="video-container" id="main-video-container">
+                            <!-- video element moves here after calibration -->
+                        </div>
+                    </div>
+                    <div class="view-panel" id="panel-history">
+                        <canvas id="session-chart"></canvas>
                     </div>
                 </div>
-                <div class="view-panel" id="panel-history">
-                    <canvas id="session-chart"></canvas>
+            </section>
+
+            <section class="gauge-panel">
+                <canvas id="gauge" width="400" height="280"></canvas>
+
+                <div class="au-breakdown">
+                    <h3>Action Unit Breakdown</h3>
+                    <div class="au-bar">
+                        <label>AU4 <span class="au-label">Brow Lowerer</span></label>
+                        <div class="bar-track"><div class="bar-fill" id="au4-bar"></div></div>
+                        <span class="au-value" id="au4-value">0.0</span>
+                    </div>
+                    <div class="au-bar">
+                        <label>AU6/7 <span class="au-label">Lid Tightener</span></label>
+                        <div class="bar-track"><div class="bar-fill" id="au67-bar"></div></div>
+                        <span class="au-value" id="au67-value">0.0</span>
+                    </div>
+                    <div class="au-bar">
+                        <label>AU9/10 <span class="au-label">Nose/Lip</span></label>
+                        <div class="bar-track"><div class="bar-fill" id="au910-bar"></div></div>
+                        <span class="au-value" id="au910-value">0.0</span>
+                    </div>
+                    <div class="au-bar">
+                        <label>AU43 <span class="au-label">Eye Closure</span></label>
+                        <div class="bar-track"><div class="bar-fill" id="au43-bar"></div></div>
+                        <span class="au-value" id="au43-value">0.0</span>
+                    </div>
                 </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="session-controls">
+                <button type="button" class="btn btn-start" id="start-btn">Start Session</button>
+                <button type="button" class="btn btn-end hidden" id="end-btn">End Session</button>
             </div>
-
-            <script>
-                function switchView(index) {
-                    var tabs = document.querySelectorAll('.view-tab');
-                    var panels = document.querySelectorAll('.view-panel');
-                    for (var i = 0; i < tabs.length; i++) {
-                        tabs[i].classList.toggle('active', i === index);
-                        panels[i].classList.toggle('active', i === index);
-                    }
-                }
-            </script>
-        </section>
-
-        <section class="gauge-panel">
-            <canvas id="gauge" width="400" height="280"></canvas>
-
-            <div class="au-breakdown">
-                <h3>Action Unit Breakdown</h3>
-                <div class="au-bar">
-                    <label>AU4 <span class="au-label">Brow Lowerer</span></label>
-                    <div class="bar-track"><div class="bar-fill" id="au4-bar"></div></div>
-                    <span class="au-value" id="au4-value">0.0</span>
-                </div>
-                <div class="au-bar">
-                    <label>AU6/7 <span class="au-label">Lid Tightener</span></label>
-                    <div class="bar-track"><div class="bar-fill" id="au67-bar"></div></div>
-                    <span class="au-value" id="au67-value">0.0</span>
-                </div>
-                <div class="au-bar">
-                    <label>AU9/10 <span class="au-label">Nose/Lip</span></label>
-                    <div class="bar-track"><div class="bar-fill" id="au910-bar"></div></div>
-                    <span class="au-value" id="au910-value">0.0</span>
-                </div>
-                <div class="au-bar">
-                    <label>AU43 <span class="au-label">Eye Closure</span></label>
-                    <div class="bar-track"><div class="bar-fill" id="au43-bar"></div></div>
-                    <span class="au-value" id="au43-value">0.0</span>
-                </div>
+            <div class="status-bar">
+                <span id="session-status">Ready</span>
+                <span id="session-timer"></span>
+                <span id="fps">FPS: --</span>
             </div>
-        </section>
-    </main>
+        </footer>
+    </div>
 
-    <footer>
-        <div class="controls">
-            <button id="calibrate-btn" disabled>Calibrate Neutral Face</button>
-            <button id="reset-btn">Reset Calibration</button>
-        </div>
-        <div class="status-bar">
-            <span id="status">Initializing...</span>
-            <span id="fps">FPS: --</span>
-            <span id="calibration-status">Uncalibrated (using defaults)</span>
-        </div>
-    </footer>
+    <!-- Tab switching (standalone) -->
+    <script>
+        function switchView(index) {
+            var tabs = document.querySelectorAll('.view-tab');
+            var panels = document.querySelectorAll('.view-panel');
+            for (var i = 0; i < tabs.length; i++) {
+                tabs[i].classList.toggle('active', i === index);
+                panels[i].classList.toggle('active', i === index);
+            }
+        }
+    </script>
 
     <!-- MediaPipe dependencies -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
