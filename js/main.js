@@ -224,6 +224,11 @@
         calibInstructions.innerHTML = 'Capturing face at <strong>current pain level</strong>...';
         calibProgress.classList.remove('hidden');
         calibProgressBar.style.width = '0%';
+        // Start video playback if in video mode
+        if (inputMode === 'video') {
+            videoEl.currentTime = 0;
+            videoEl.play();
+        }
     });
 
     function onCalibrationComplete() {
@@ -232,6 +237,10 @@
         const level = engine.baselinePainLevel;
         calibInstructions.innerHTML = `Calibrated at pain level <strong>${level}</strong>. Returning...`;
         calibProgress.classList.add('hidden');
+        // Pause video after calibration capture
+        if (inputMode === 'video') {
+            videoEl.pause();
+        }
 
         // Move video back to main screen after short delay
         setTimeout(() => {
@@ -268,13 +277,18 @@
         if (sessionActive) {
             endSession();
         }
+        // Pause video so it waits for Calibrate press
+        if (inputMode === 'video') {
+            videoEl.pause();
+            videoEl.currentTime = 0;
+        }
         // Move video to calibration screen
         moveVideoToCalib();
         // Reset calibration UI
         calibrateBtn.disabled = false;
         calibrateBtn.textContent = 'Calibrate';
         calibInstructions.innerHTML = 'What is the patient\'s <strong>current pain level</strong>?';
-        calibStatus.textContent = 'Camera ready. Click Calibrate when ready.';
+        calibStatus.textContent = inputMode === 'video' ? 'Video paused. Click Calibrate to begin.' : 'Camera ready. Click Calibrate when ready.';
         selectPainLevel(0);
         engine.resetCalibration();
         showScreen(screenCalib);
@@ -295,6 +309,11 @@
         chart.resetRecording();
         chart.startRecording();
         engine.smoothingWindow = [];
+        // Restart video from beginning
+        if (inputMode === 'video') {
+            videoEl.currentTime = 0;
+            videoEl.play();
+        }
 
         sessionActive = true;
         startBtn.classList.add('hidden');
@@ -311,6 +330,10 @@
         sessionActive = false;
         chart.stopRecording();
         stopTimer();
+        // Pause video on session end
+        if (inputMode === 'video') {
+            videoEl.pause();
+        }
 
         endBtn.classList.add('hidden');
         startBtn.classList.remove('hidden');
@@ -493,10 +516,12 @@
 
         videoEl.addEventListener('loadeddata', function onLoaded() {
             videoEl.removeEventListener('loadeddata', onLoaded);
-            videoEl.play();
             inputMode = 'video';
             loadVideoBtn.classList.add('hidden');
             backToCameraBtn.classList.remove('hidden');
+            // Don't autoplay — wait for Start Session or Calibrate
+            videoEl.pause();
+            videoEl.currentTime = 0;
             startVideoLoop();
         });
     }
