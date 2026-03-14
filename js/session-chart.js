@@ -53,8 +53,19 @@ class SessionChart {
 
     // ── Rendering ─────────────────────────────────────────────────
 
+    _resizeCanvas() {
+        const rect = this.canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = rect.width * dpr;
+        this.canvas.height = rect.height * dpr;
+        this.ctx.scale(dpr, dpr);
+        this._displayWidth = rect.width;
+        this._displayHeight = rect.height;
+    }
+
     _startRender() {
         const render = () => {
+            this._resizeCanvas();
             this._draw();
             this._animFrame = requestAnimationFrame(render);
         };
@@ -63,8 +74,8 @@ class SessionChart {
 
     _draw() {
         const ctx = this.ctx;
-        const w = this.canvas.width;
-        const h = this.canvas.height;
+        const w = this._displayWidth || this.canvas.width;
+        const h = this._displayHeight || this.canvas.height;
         const p = this.padding;
 
         ctx.clearRect(0, 0, w, h);

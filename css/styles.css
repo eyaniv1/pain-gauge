@@ -10,9 +10,10 @@ body {
     font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
     background: #f5f5f7;
     color: #1d1d1f;
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 /* ── Header ──────────────────────────────────────────────── */
@@ -47,6 +48,8 @@ main {
     max-width: 1200px;
     margin: 0 auto;
     width: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 /* ── Left Panel (Camera / History) ────────────────────────── */
@@ -54,9 +57,9 @@ main {
 .left-panel {
     flex: 1;
     min-width: 0;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    gap: 0;
 }
 
 /* ── View Tabs ───────────────────────────────────────────── */
@@ -101,16 +104,20 @@ main {
 /* ── Swipe Container ─────────────────────────────────────── */
 
 .swipe-container {
+    flex: 1;
+    min-height: 0;
     overflow: hidden;
     border-radius: 0 0 12px 12px;
     border: 1px solid #ddd;
     border-top: none;
     background: #000;
     touch-action: pan-y;
+    position: relative;
 }
 
 .swipe-track {
     display: flex;
+    height: 100%;
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
     will-change: transform;
 }
@@ -121,6 +128,7 @@ main {
 
 .swipe-slide {
     min-width: 100%;
+    height: 100%;
     flex-shrink: 0;
 }
 
@@ -133,8 +141,7 @@ main {
 
 #session-chart {
     width: 100%;
-    height: auto;
-    aspect-ratio: 4/3;
+    height: 100%;
 }
 
 /* ── Video Panel ─────────────────────────────────────────── */
@@ -142,9 +149,9 @@ main {
 .video-container {
     position: relative;
     background: #000;
-    border-radius: 12px;
     overflow: hidden;
-    aspect-ratio: 4/3;
+    width: 100%;
+    height: 100%;
 }
 
 .video-container video {
@@ -189,6 +196,8 @@ main {
     flex-direction: column;
     align-items: center;
     gap: 20px;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 #gauge {
