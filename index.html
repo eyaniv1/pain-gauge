@@ -16,25 +16,32 @@
         <section class="left-panel">
             <!-- Toggle tabs -->
             <div class="view-tabs">
-                <button class="view-tab active" data-view="camera">Camera</button>
-                <button class="view-tab" data-view="history">History</button>
+                <button type="button" class="view-tab active" id="tab-camera" onclick="switchView(0)">Camera</button>
+                <button type="button" class="view-tab" id="tab-history" onclick="switchView(1)">History</button>
             </div>
 
-            <!-- Swipeable container -->
-            <div class="swipe-container">
-                <div class="swipe-track">
-                    <div class="swipe-slide" data-view="camera">
-                        <div class="video-container">
-                            <video id="webcam" playsinline></video>
-                            <canvas id="overlay"></canvas>
-                            <div id="no-face-warning" class="hidden">No face detected</div>
-                        </div>
-                    </div>
-                    <div class="swipe-slide" data-view="history">
-                        <canvas id="session-chart" width="640" height="480"></canvas>
-                    </div>
+            <!-- View panels (only one visible at a time) -->
+            <div class="view-panel active" id="panel-camera">
+                <div class="video-container">
+                    <video id="webcam" playsinline></video>
+                    <canvas id="overlay"></canvas>
+                    <div id="no-face-warning" class="hidden">No face detected</div>
                 </div>
             </div>
+            <div class="view-panel" id="panel-history">
+                <canvas id="session-chart"></canvas>
+            </div>
+
+            <script>
+                function switchView(index) {
+                    var tabs = document.querySelectorAll('.view-tab');
+                    var panels = document.querySelectorAll('.view-panel');
+                    for (var i = 0; i < tabs.length; i++) {
+                        tabs[i].classList.toggle('active', i === index);
+                        panels[i].classList.toggle('active', i === index);
+                    }
+                }
+            </script>
         </section>
 
         <section class="gauge-panel">

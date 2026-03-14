@@ -2,7 +2,7 @@
  * Main Application
  *
  * Wires together: Camera → MediaPipe FaceMesh → PainEngine → PainGauge
- * Plus: Session chart, view switching (tabs + swipe)
+ * Tab switching is handled inline in index.html for reliability.
  */
 
 (function () {
@@ -20,10 +20,6 @@
     const fpsEl = document.getElementById('fps');
     const calibStatusEl = document.getElementById('calibration-status');
 
-    // Swipe / tabs
-    const swipeTrack = document.querySelector('.swipe-track');
-    const viewTabs = document.querySelectorAll('.view-tab');
-
     // AU bar elements
     const auBars = {
         au4: { bar: document.getElementById('au4-bar'), value: document.getElementById('au4-value') },
@@ -37,59 +33,6 @@
     const engine = new PainEngine({ smoothingSize: 8 });
     const gauge = new PainGauge('gauge');
     const chart = new SessionChart('session-chart');
-
-    // ── View switching (tabs + swipe) ─────────────────────────────
-
-    let currentView = 0; // 0 = camera, 1 = history
-
-    function switchView(index) {
-        currentView = index;
-        swipeTrack.style.transform = `translateX(-${index * 100}%)`;
-        viewTabs.forEach((tab, i) => {
-            tab.classList.toggle('active', i === index);
-        });
-    }
-
-    // Tab clicks
-    viewTabs.forEach((tab, i) => {
-        tab.addEventListener('click', () => switchView(i));
-    });
-
-    // Touch swipe
-    let touchStartX = 0;
-    let touchDeltaX = 0;
-    let isSwiping = false;
-    const swipeContainer = document.querySelector('.swipe-container');
-
-    swipeContainer.addEventListener('touchstart', (e) => {
-        touchStartX = e.touches[0].clientX;
-        touchDeltaX = 0;
-        isSwiping = true;
-        swipeTrack.classList.add('swiping');
-    }, { passive: true });
-
-    swipeContainer.addEventListener('touchmove', (e) => {
-        if (!isSwiping) return;
-        touchDeltaX = e.touches[0].clientX - touchStartX;
-        const baseOffset = -currentView * 100;
-        const dragPercent = (touchDeltaX / swipeContainer.offsetWidth) * 100;
-        swipeTrack.style.transform = `translateX(${baseOffset + dragPercent}%)`;
-    }, { passive: true });
-
-    swipeContainer.addEventListener('touchend', () => {
-        if (!isSwiping) return;
-        isSwiping = false;
-        swipeTrack.classList.remove('swiping');
-
-        const threshold = swipeContainer.offsetWidth * 0.25;
-        if (touchDeltaX < -threshold && currentView < 1) {
-            switchView(1);
-        } else if (touchDeltaX > threshold && currentView > 0) {
-            switchView(0);
-        } else {
-            switchView(currentView); // snap back
-        }
-    });
 
     // ── FPS tracking ──────────────────────────────────────────────
 
