@@ -350,15 +350,45 @@ footer {
 /* ── Responsive ──────────────────────────────────────────── */
 
 @media (max-width: 900px) {
+    body {
+        height: auto;
+        min-height: 100vh;
+        overflow: auto;
+    }
+
     main {
         flex-direction: column;
+        overflow: visible;
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .left-panel {
+        flex: none;
+    }
+
+    .panels-container {
+        flex: none;
+        height: 56vw; /* roughly 4:3 aspect based on viewport width */
     }
 
     .gauge-panel {
         width: 100%;
+        overflow: visible;
     }
 
     #gauge {
         max-width: 400px;
+    }
+
+    footer {
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px 16px;
+    }
+
+    .status-bar {
+        gap: 10px;
+        font-size: 11px;
     }
 }
