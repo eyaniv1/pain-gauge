@@ -107,8 +107,8 @@
 
     // ── DOM refs: Video input ────────────────────────────────────
 
+    const cameraBtn = document.getElementById('camera-btn');
     const loadVideoBtn = document.getElementById('load-video-btn');
-    const backToCameraBtn = document.getElementById('back-to-camera-btn');
     const videoFileInput = document.getElementById('video-file-input');
 
     // ── Initialize engine, gauge & chart ──────────────────────────
@@ -470,8 +470,8 @@
 
             await cameraInstance.start();
             inputMode = 'camera';
-            loadVideoBtn.classList.remove('hidden');
-            backToCameraBtn.classList.add('hidden');
+            cameraBtn.classList.add('active');
+            loadVideoBtn.classList.remove('active');
             videoEl.style.transform = '';
             overlayEl.style.transform = '';
         } catch (err) {
@@ -481,12 +481,13 @@
 
     // ── Video file input ─────────────────────────────────────────
 
-    loadVideoBtn.addEventListener('click', () => {
-        videoFileInput.click();
+    cameraBtn.addEventListener('click', () => {
+        if (inputMode === 'camera') return;
+        startCamera();
     });
 
-    backToCameraBtn.addEventListener('click', () => {
-        startCamera();
+    loadVideoBtn.addEventListener('click', () => {
+        videoFileInput.click();
     });
 
     videoFileInput.addEventListener('change', (e) => {
@@ -517,8 +518,8 @@
         videoEl.addEventListener('loadeddata', function onLoaded() {
             videoEl.removeEventListener('loadeddata', onLoaded);
             inputMode = 'video';
-            loadVideoBtn.classList.add('hidden');
-            backToCameraBtn.classList.remove('hidden');
+            loadVideoBtn.classList.add('active');
+            cameraBtn.classList.remove('active');
             // Don't autoplay — wait for Start Session or Calibrate
             videoEl.pause();
             videoEl.currentTime = 0;

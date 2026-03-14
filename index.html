@@ -82,8 +82,14 @@
             <button type="button" class="btn btn-start btn-small" id="start-btn">Start Session</button>
             <button type="button" class="btn btn-end btn-small hidden" id="end-btn">End Session</button>
             <button type="button" class="btn btn-small" id="recalibrate-btn">Calibrate</button>
-            <button type="button" class="btn btn-small" id="load-video-btn">Load Video</button>
-            <button type="button" class="btn btn-small hidden" id="back-to-camera-btn">Live Camera</button>
+            <div class="source-buttons">
+                <button type="button" class="btn btn-small btn-source active" id="camera-btn" title="Live Camera">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                </button>
+                <button type="button" class="btn btn-small btn-source" id="load-video-btn" title="Load Video File">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+                </button>
+            </div>
             <input type="file" id="video-file-input" accept="video/*" class="hidden">
             <button type="button" class="btn btn-small" id="settings-btn">Settings</button>
         </header>
