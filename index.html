@@ -13,11 +13,27 @@
     </header>
 
     <main>
-        <section class="video-panel">
-            <div class="video-container">
-                <video id="webcam" playsinline></video>
-                <canvas id="overlay"></canvas>
-                <div id="no-face-warning" class="hidden">No face detected</div>
+        <section class="left-panel">
+            <!-- Toggle tabs -->
+            <div class="view-tabs">
+                <button class="view-tab active" data-view="camera">Camera</button>
+                <button class="view-tab" data-view="history">History</button>
+            </div>
+
+            <!-- Swipeable container -->
+            <div class="swipe-container">
+                <div class="swipe-track">
+                    <div class="swipe-slide" data-view="camera">
+                        <div class="video-container">
+                            <video id="webcam" playsinline></video>
+                            <canvas id="overlay"></canvas>
+                            <div id="no-face-warning" class="hidden">No face detected</div>
+                        </div>
+                    </div>
+                    <div class="swipe-slide" data-view="history">
+                        <canvas id="session-chart" width="640" height="480"></canvas>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -70,6 +86,7 @@
     <!-- Application -->
     <script src="js/pain-engine.js"></script>
     <script src="js/gauge.js"></script>
+    <script src="js/session-chart.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

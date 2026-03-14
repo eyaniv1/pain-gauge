@@ -49,12 +49,95 @@ main {
     width: 100%;
 }
 
-/* ── Video Panel ─────────────────────────────────────────── */
+/* ── Left Panel (Camera / History) ────────────────────────── */
 
-.video-panel {
+.left-panel {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
 }
+
+/* ── View Tabs ───────────────────────────────────────────── */
+
+.view-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: 0;
+}
+
+.view-tab {
+    flex: 1;
+    padding: 10px 16px;
+    border: 1px solid #ddd;
+    background: #f0f0f0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-bottom: none;
+}
+
+.view-tab:first-child {
+    border-radius: 12px 0 0 0;
+}
+
+.view-tab:last-child {
+    border-radius: 0 12px 0 0;
+}
+
+.view-tab.active {
+    background: #fff;
+    color: #c0392b;
+    border-bottom-color: transparent;
+}
+
+.view-tab:hover:not(.active) {
+    background: #e8e8e8;
+}
+
+/* ── Swipe Container ─────────────────────────────────────── */
+
+.swipe-container {
+    overflow: hidden;
+    border-radius: 0 0 12px 12px;
+    border: 1px solid #ddd;
+    border-top: none;
+    background: #000;
+    touch-action: pan-y;
+}
+
+.swipe-track {
+    display: flex;
+    transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+}
+
+.swipe-track.swiping {
+    transition: none;
+}
+
+.swipe-slide {
+    min-width: 100%;
+    flex-shrink: 0;
+}
+
+.swipe-slide[data-view="history"] {
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#session-chart {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 4/3;
+}
+
+/* ── Video Panel ─────────────────────────────────────────── */
 
 .video-container {
     position: relative;
