@@ -1,9 +1,13 @@
 """
 Convert TaatiTeam pain detection model to ONNX.
 
-The original model takes 2-channel input (target + reference frame).
-This wrapper uses a learned zero reference, making it a single-image model.
-The output is the PSPI pain score (0-16 scale, we'll normalize to 0-10 in our pipeline).
+Exports the base comparative model with 2-channel input (target + reference frame).
+The inference service handles reference frame management at runtime:
+- When calibrated: uses the patient's calibration face as reference
+- When not calibrated: uses a zero reference (fallback)
+
+Output: 40 regression values. Last 3 are PSPI for [Dementia, Healthy, UNBC].
+We use the UNBC PSPI (index -1) in the inference pipeline.
 """
 
 import os
@@ -40,7 +44,7 @@ class ConvNetOrdinalLateFusion(nn.Module):
         self.fc1 = nn.Linear(4608, fc2_size)
         self.fc2 = nn.Linear(fc2_size, num_outputs)
 
-    def forward(self, x, return_features=False):
+    def forward(self, x):
         out = self.layer1(x[:, 0:1, ...])
         out_ref = self.layer1(x[:, 1:, ...])
         out = out - out_ref
@@ -51,66 +55,40 @@ class ConvNetOrdinalLateFusion(nn.Module):
         features = self.fc1(out.reshape(out.size(0), -1))
         features = nn.functional.relu(features)
         pred = self.fc2(features)
-        if return_features:
-            return pred, features
-        else:
-            return pred
-
-
-class SingleImagePainModel(nn.Module):
-    """Wraps the comparative model to accept single-channel input.
-    Uses a zero reference frame (no subject-specific calibration)."""
-
-    def __init__(self, base_model):
-        super(SingleImagePainModel, self).__init__()
-        self.base_model = base_model
-
-    def forward(self, x):
-        # x is (batch, 1, H, W) — single grayscale image
-        # Create zero reference frame
-        ref = torch.zeros_like(x)
-        # Concatenate: (batch, 2, H, W)
-        combined = torch.cat([x, ref], dim=1)
-        # Get prediction — last 3 outputs are PSPI for [Dementia, Healthy, UNBC]
-        pred = self.base_model(combined)
-        # Take UNBC PSPI prediction (index -1), clamp to 0-16
-        pspi = torch.clamp(pred[:, -1:], 0, 16)
-        # Normalize to 0-10 scale
-        score = pspi * (10.0 / 16.0)
-        return score
+        return pred
 
 
 def convert(checkpoint_path, output_path, num_outputs=40):
-    """Load TaatiTeam checkpoint and export as single-image ONNX model."""
+    """Load TaatiTeam checkpoint and export as 2-channel comparative ONNX model."""
     print(f"Loading checkpoint: {checkpoint_path}")
 
     # Load original model
-    base_model = ConvNetOrdinalLateFusion(num_outputs=num_outputs)
+    model = ConvNetOrdinalLateFusion(num_outputs=num_outputs)
     state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
-    base_model.load_state_dict(state_dict)
-    base_model.eval()
+    model.load_state_dict(state_dict)
+    model.eval()
 
-    # Wrap for single-image input
-    wrapper = SingleImagePainModel(base_model)
-    wrapper.eval()
-
-    # Create dummy input (batch=1, channels=1, 160x160 grayscale)
-    dummy_input = torch.randn(1, 1, 160, 160)
+    # Create dummy input: (batch=1, channels=2, 160x160)
+    # Channel 0 = target face, Channel 1 = reference face
+    dummy_input = torch.randn(1, 2, 160, 160)
 
     # Test forward pass
     with torch.no_grad():
-        test_output = wrapper(dummy_input)
-        print(f"Test output shape: {test_output.shape}, value: {test_output.item():.2f}")
+        test_output = model(dummy_input)
+        print(f"Test output shape: {test_output.shape}")
+        # Last 3 outputs are PSPI for [Dementia, Healthy, UNBC]
+        pspi_unbc = test_output[0, -1].item()
+        print(f"UNBC PSPI (raw): {pspi_unbc:.2f}")
 
     # Export to ONNX using legacy exporter (more compatible)
     print(f"Exporting to: {output_path}")
     torch.onnx.export(
-        wrapper,
+        model,
         dummy_input,
         output_path,
         input_names=["input"],
-        output_names=["pain_score"],
-        dynamic_axes={"input": {0: "batch"}, "pain_score": {0: "batch"}},
+        output_names=["predictions"],
+        dynamic_axes={"input": {0: "batch"}, "predictions": {0: "batch"}},
         opset_version=17,
         dynamo=False,
     )
@@ -123,8 +101,22 @@ def convert(checkpoint_path, output_path, num_outputs=40):
     print(f"ONNX input: {input_info.name} {input_info.shape}")
     print(f"ONNX output: {output_info.name} {output_info.shape}")
 
-    result = session.run(None, {"input": dummy_input.numpy()})
-    print(f"ONNX test output: {result[0].flatten()[0]:.2f}")
+    # Test with zero reference (equivalent to uncalibrated mode)
+    test_target = np.random.randn(1, 1, 160, 160).astype(np.float32)
+    test_ref = np.zeros((1, 1, 160, 160), dtype=np.float32)
+    test_combined = np.concatenate([test_target, test_ref], axis=1)
+    result = session.run(None, {"input": test_combined})
+    pspi = np.clip(result[0][0, -1], 0, 16)
+    score = pspi * (10.0 / 16.0)
+    print(f"ONNX test (zero ref): PSPI={pspi:.2f}, score={score:.2f}/10")
+
+    # Test with same image as both target and reference (should give ~0 pain)
+    test_same = np.concatenate([test_target, test_target], axis=1)
+    result_same = session.run(None, {"input": test_same})
+    pspi_same = np.clip(result_same[0][0, -1], 0, 16)
+    score_same = pspi_same * (10.0 / 16.0)
+    print(f"ONNX test (self ref): PSPI={pspi_same:.2f}, score={score_same:.2f}/10")
+
     print("Conversion complete!")
 
 
@@ -132,7 +124,7 @@ if __name__ == "__main__":
     # Default paths
     repo_dir = os.path.join(os.path.dirname(__file__), "..", "..", "pain_detection_demo")
     checkpoint = os.path.join(repo_dir, "checkpoints", "50342566", "50343918_3", "model_epoch4.pt")
-    output = os.path.join(os.path.dirname(__file__), "..", "models", "active", "pain-unbc-v1.onnx")
+    output = os.path.join(os.path.dirname(__file__), "..", "models", "active", "pain-unbc-v2.onnx")
 
     if len(sys.argv) > 1:
         checkpoint = sys.argv[1]

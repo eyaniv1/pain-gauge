@@ -359,7 +359,7 @@
         }
     });
 
-    function onCalibrationComplete() {
+    async function onCalibrationComplete() {
         isCalibrating = false;
         calibrateBtn.textContent = 'Calibrated!';
         const level = engine.baselinePainLevel;
@@ -368,6 +368,16 @@
         if (inputMode === 'video') {
             videoEl.pause();
         }
+
+        // Send calibration frame to AI inference service
+        if (PainGaugeAPI.isConnected()) {
+            const frame = captureFrame();
+            const aiResult = await PainGaugeAPI.calibrateAI(frame, level);
+            if (aiResult && aiResult.ok) {
+                console.log(`AI calibrated at pain level ${level}, face_detected=${aiResult.face_detected}`);
+            }
+        }
+
         setTimeout(() => {
             moveVideoToMain();
             showScreen(screenMain);
@@ -396,7 +406,7 @@
 
     // ── Calibrate (go to calibration screen) ─────────────────────
 
-    recalibrateBtn.addEventListener('click', () => {
+    recalibrateBtn.addEventListener('click', async () => {
         if (sessionActive) {
             endSession();
         }
@@ -411,6 +421,12 @@
         calibStatus.textContent = inputMode === 'video' ? 'Video paused. Click Calibrate to begin.' : 'Camera ready. Click Calibrate when ready.';
         selectPainLevel(0);
         engine.resetCalibration();
+
+        // Clear AI calibration too
+        if (PainGaugeAPI.isConnected()) {
+            await PainGaugeAPI.clearAICalibration();
+        }
+
         showScreen(screenCalib);
     });
 
@@ -1003,8 +1019,11 @@
         const status = await PainGaugeAPI.getInferenceStatus();
         if (aiStatusDot) {
             if (status && status.online) {
+                const detail = status.detail || {};
+                const ver = detail.model_version || '';
+                const cal = detail.calibrated ? ' [calibrated]' : '';
                 aiStatusDot.className = 'ai-status-dot online';
-                aiStatusDot.title = 'AI: Online' + (status.detail && status.detail.model_version ? ` (${status.detail.model_version})` : '');
+                aiStatusDot.title = `AI: Online${ver ? ` (${ver})` : ''}${cal}`;
             } else {
                 aiStatusDot.className = 'ai-status-dot offline';
                 aiStatusDot.title = 'AI: Offline';

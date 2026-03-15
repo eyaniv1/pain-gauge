@@ -156,9 +156,8 @@ async function requestInference(imageBase64, sensorData) {
     try {
         const body = { image: imageBase64 };
         if (sensorData) {
-            // Pass AU data if available in sensor_data
             const parsed = typeof sensorData === 'string' ? JSON.parse(sensorData) : sensorData;
-            if (parsed.au) body.au_data = parsed.au;
+            if (parsed.face) body.au_data = parsed.face;
         }
 
         const resp = await fetch(`${INFERENCE_URL}/predict`, {
@@ -172,6 +171,38 @@ async function requestInference(imageBase64, sensorData) {
         return await resp.json();
     } catch (err) {
         console.warn(`Inference request failed: ${err.message}`);
+        return null;
+    }
+}
+
+async function requestCalibration(imageBase64, painLevel) {
+    try {
+        const resp = await fetch(`${INFERENCE_URL}/calibrate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: imageBase64, pain_level: painLevel }),
+            signal: AbortSignal.timeout(3000),
+        });
+
+        if (!resp.ok) return null;
+        return await resp.json();
+    } catch (err) {
+        console.warn(`Calibration request failed: ${err.message}`);
+        return null;
+    }
+}
+
+async function requestClearCalibration() {
+    try {
+        const resp = await fetch(`${INFERENCE_URL}/clear-calibration`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(2000),
+        });
+        if (!resp.ok) return null;
+        return await resp.json();
+    } catch (err) {
+        console.warn(`Clear calibration failed: ${err.message}`);
         return null;
     }
 }
@@ -374,6 +405,24 @@ app.get('/api/inference/status', async (req, res) => {
         detail: inference.detail,
         last_check: inference.lastCheck ? new Date(inference.lastCheck).toISOString() : null,
     });
+});
+
+// ── API Routes: AI Calibration ────────────────────────────
+
+app.post('/api/inference/calibrate', async (req, res) => {
+    const { image, pain_level } = req.body;
+    if (!image) return res.status(400).json({ error: 'image is required' });
+    if (pain_level === undefined) return res.status(400).json({ error: 'pain_level is required' });
+
+    const result = await requestCalibration(image, pain_level);
+    if (!result) return res.status(502).json({ error: 'Inference service unavailable' });
+    res.json(result);
+});
+
+app.post('/api/inference/clear-calibration', async (req, res) => {
+    const result = await requestClearCalibration();
+    if (!result) return res.status(502).json({ error: 'Inference service unavailable' });
+    res.json(result);
 });
 
 // ── Start server ───────────────────────────────────────────

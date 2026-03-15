@@ -149,7 +149,7 @@ def crop_and_resize(
 
 def normalize(image_bgr: np.ndarray) -> np.ndarray:
     """
-    Normalize image for model input.
+    Normalize image for model input (ImageNet-style RGB).
 
     Converts BGR to RGB, scales to [0, 1], applies ImageNet normalization,
     and transposes to (1, C, H, W) format.
@@ -178,10 +178,41 @@ def normalize(image_bgr: np.ndarray) -> np.ndarray:
     return img
 
 
+# Lazy-loaded CLAHE instance
+_clahe = None
+
+
+def _get_clahe():
+    global _clahe
+    if _clahe is None:
+        _clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    return _clahe
+
+
+def normalize_grayscale(image_bgr: np.ndarray) -> np.ndarray:
+    """
+    Normalize image for grayscale model input (TaatiTeam-style).
+
+    Converts to grayscale, applies CLAHE histogram equalization,
+    scales to [0, 1], returns (1, 1, H, W) format.
+
+    Args:
+        image_bgr: BGR image, uint8, shape (H, W, 3).
+
+    Returns:
+        Float32 array, shape (1, 1, H, W), normalized to [0, 1].
+    """
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    gray = _get_clahe().apply(gray)
+    img = gray.astype(np.float32) / 255.0
+    return img.reshape(1, 1, img.shape[0], img.shape[1])
+
+
 def preprocess(
     image_data: str | bytes,
     target_size: tuple[int, int] = (224, 224),
     require_face: bool = True,
+    grayscale: bool = False,
 ) -> PreprocessResult | None:
     """
     Full preprocessing pipeline: decode → detect face → crop → resize → normalize.
@@ -190,6 +221,7 @@ def preprocess(
         image_data: Base64-encoded image string or raw bytes.
         target_size: Model input dimensions (width, height).
         require_face: If True, returns None when no face is detected.
+        grayscale: If True, output grayscale with CLAHE (1,1,H,W) instead of RGB (1,3,H,W).
 
     Returns:
         PreprocessResult with model-ready array, or None on failure.
@@ -210,7 +242,10 @@ def preprocess(
     resized = crop_and_resize(image_bgr, bbox, target_size)
 
     # Normalize
-    image_array = normalize(resized)
+    if grayscale:
+        image_array = normalize_grayscale(resized)
+    else:
+        image_array = normalize(resized)
 
     return PreprocessResult(
         image_array=image_array,

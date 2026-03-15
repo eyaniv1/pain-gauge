@@ -3,12 +3,16 @@ Pain Gauge AI Inference Service
 
 FastAPI microservice that loads a pre-trained pain detection model
 and provides inference via HTTP API. Binds to localhost only.
+
+Supports comparative models: when calibrated with a reference frame,
+the model compares the current face against the calibration face to
+detect changes in pain expression.
 """
 
 import time
 from contextlib import asynccontextmanager
-from typing import Any
 
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -21,17 +25,28 @@ from preprocessing import preprocess
 manager = ModelManager()
 startup_time: float = 0.0
 
+# ── Calibration State ─────────────────────────────────────
+# Stores the reference frame and pain level from calibration.
+# Single-user app, so one reference at a time is sufficient.
+
+_calibration = {
+    "reference_frame": None,   # Preprocessed grayscale array (1, 1, H, W)
+    "pain_level": 0,           # Patient's reported pain at calibration (0-10)
+    "calibrated": False,
+}
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global startup_time
     startup_time = time.time()
 
-    # Attempt to load model on startup
     loaded = manager.load()
     if loaded:
         status = manager.get_status()
         print(f"Model loaded: {status['version']} ({status['format']})")
+        if manager.is_comparative():
+            print("Comparative model detected — calibration will provide reference frame")
     else:
         print("No model found — service running without model. Place a model in models/active/")
 
@@ -40,18 +55,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Pain Gauge Inference Service",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
 
-# ── Response Models ───────────────────────────────────────
+# ── Request / Response Models ─────────────────────────────
 
 class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     model_version: str | None = None
     model_format: str | None = None
+    comparative: bool = False
+    calibrated: bool = False
     uptime_s: float = 0.0
 
 
@@ -76,9 +93,20 @@ class ActivateResponse(BaseModel):
     active_model: str | None = None
 
 
+class CalibrateRequest(BaseModel):
+    image: str       # base64-encoded face image at calibration
+    pain_level: int  # patient's reported pain (0-10)
+
+
+class CalibrateResponse(BaseModel):
+    ok: bool
+    pain_level: int
+    face_detected: bool
+
+
 class PredictRequest(BaseModel):
     image: str  # base64-encoded image
-    au_data: dict | None = None  # optional AU data from face-api.js
+    au_data: dict | None = None
 
 
 class PredictResponse(BaseModel):
@@ -87,9 +115,30 @@ class PredictResponse(BaseModel):
     model_version: str | None = None
     inference_ms: float = 0.0
     face_detected: bool = True
+    calibrated: bool = False
     model_score: float | None = None
     au_score: float | None = None
     au_weights_applied: dict | None = None
+
+
+# ── Helper: get model target size ─────────────────────────
+
+def _get_target_size():
+    """Get (width, height) from model input shape."""
+    status = manager.get_status()
+    input_shape = status.get("input_shape")
+    if input_shape and len(input_shape) == 4:
+        return (input_shape[3], input_shape[2])
+    return (224, 224)
+
+
+def _is_grayscale_model():
+    """Check if model expects grayscale input."""
+    status = manager.get_status()
+    input_shape = status.get("input_shape")
+    if input_shape and len(input_shape) == 4:
+        return input_shape[1] in (1, 2)  # 1-channel or 2-channel (comparative)
+    return False
 
 
 # ── Endpoints ─────────────────────────────────────────────
@@ -103,6 +152,8 @@ async def health():
         model_loaded=status["loaded"],
         model_version=status["version"],
         model_format=status["format"],
+        comparative=manager.is_comparative(),
+        calibrated=_calibration["calibrated"],
         uptime_s=round(uptime, 1),
     )
 
@@ -120,41 +171,110 @@ async def activate_model(req: ActivateRequest):
     return ActivateResponse(ok=True, active_model=manager.version)
 
 
-@app.post("/predict", response_model=PredictResponse)
-async def predict(req: PredictRequest):
-    # Check model is loaded
-    if not manager.loaded:
-        raise HTTPException(status_code=503, detail="No model loaded")
+@app.post("/calibrate", response_model=CalibrateResponse)
+async def calibrate(req: CalibrateRequest):
+    """
+    Store a reference frame for comparative inference.
 
-    # Determine target size from model's expected input
-    status = manager.get_status()
-    input_shape = status.get("input_shape")
-    if input_shape and len(input_shape) == 4:
-        # Shape is (batch, channels, height, width)
-        target_size = (input_shape[3], input_shape[2])  # (width, height)
-    else:
-        target_size = (224, 224)
+    The clinician captures the patient's face at a known pain level.
+    This becomes the baseline for detecting relative changes.
+    """
+    target_size = _get_target_size()
+    use_grayscale = _is_grayscale_model()
 
-    # Preprocess image — try with face detection, fall back to full image
-    result = preprocess(req.image, target_size=target_size, require_face=False)
+    result = preprocess(req.image, target_size=target_size, require_face=False, grayscale=use_grayscale)
     if result is None:
         raise HTTPException(status_code=400, detail="Invalid image data")
 
-    # Adapt channels if model expects grayscale (1 channel) but preprocessing outputs RGB (3 channels)
+    pain_level = max(0, min(10, req.pain_level))
+
+    _calibration["reference_frame"] = result.image_array  # (1, 1, H, W) grayscale
+    _calibration["pain_level"] = pain_level
+    _calibration["calibrated"] = True
+
+    print(f"Calibrated: reference frame stored at pain level {pain_level}, "
+          f"face_detected={result.face_found}, shape={result.image_array.shape}")
+
+    return CalibrateResponse(
+        ok=True,
+        pain_level=pain_level,
+        face_detected=result.face_found,
+    )
+
+
+@app.post("/clear-calibration")
+async def clear_calibration():
+    """Clear the stored reference frame."""
+    _calibration["reference_frame"] = None
+    _calibration["pain_level"] = 0
+    _calibration["calibrated"] = False
+    return {"ok": True}
+
+
+@app.post("/predict", response_model=PredictResponse)
+async def predict(req: PredictRequest):
+    if not manager.loaded:
+        raise HTTPException(status_code=503, detail="No model loaded")
+
+    target_size = _get_target_size()
+    use_grayscale = _is_grayscale_model()
+
+    # Preprocess the target (current) frame
+    result = preprocess(req.image, target_size=target_size, require_face=False, grayscale=use_grayscale)
+    if result is None:
+        raise HTTPException(status_code=400, detail="Invalid image data")
+
     image_array = result.image_array
-    if input_shape and len(input_shape) == 4 and input_shape[1] == 1 and image_array.shape[1] == 3:
-        # Convert RGB to grayscale: standard luminance weights
-        image_array = 0.2989 * image_array[:, 0:1, :, :] + \
-                      0.5870 * image_array[:, 1:2, :, :] + \
-                      0.1140 * image_array[:, 2:3, :, :]
+
+    # For comparative models: concatenate target + reference along channel axis
+    if manager.is_comparative():
+        target = image_array  # (1, 1, H, W)
+
+        if _calibration["calibrated"] and _calibration["reference_frame"] is not None:
+            reference = _calibration["reference_frame"]  # (1, 1, H, W)
+        else:
+            # No calibration — use zero reference (fallback)
+            reference = np.zeros_like(target)
+
+        # Combine: (1, 2, H, W) — channel 0 = target, channel 1 = reference
+        image_array = np.concatenate([target, reference], axis=1)
+    elif not use_grayscale and image_array.shape[1] == 3:
+        # Non-comparative model that might need channel adaptation
+        status = manager.get_status()
+        input_shape = status.get("input_shape")
+        if input_shape and len(input_shape) == 4 and input_shape[1] == 1:
+            image_array = 0.2989 * image_array[:, 0:1, :, :] + \
+                          0.5870 * image_array[:, 1:2, :, :] + \
+                          0.1140 * image_array[:, 2:3, :, :]
 
     # Run inference
     prediction = manager.predict(image_array)
+    raw_model_score = prediction["score"]
+
+    # For comparative models with calibration: anchor score to calibration pain level
+    # The model outputs a PSPI-based score (0-10). When calibrated, we interpret
+    # the model's output as a *change* from the calibration state.
+    # - If model score > calibration baseline score → pain increased
+    # - If model score < calibration baseline score → pain decreased
+    if manager.is_comparative() and _calibration["calibrated"]:
+        # Get the model's score for the current frame vs reference
+        # The comparative model already subtracts features, so:
+        # - Score ~0 means current face looks like the reference (same pain level)
+        # - Higher score means more pain than reference
+        # We anchor this to the calibration pain level
+        cal_pain = _calibration["pain_level"]
+        model_score = prediction["score"]
+
+        # model_score is on 0-10 scale from PSPI.
+        # When target == reference, model outputs ~0 (no difference).
+        # The model_score represents additional pain beyond the reference.
+        # Anchor: calibration_pain + model_delta
+        anchored = cal_pain + model_score
+        prediction["score"] = round(max(0, min(10, anchored)), 2)
 
     # Blend with AU data if provided
     blended = blend_scores(prediction["score"], req.au_data)
 
-    # Lower confidence when no face was detected
     confidence = prediction["confidence"]
     if not result.face_found:
         confidence = round(confidence * 0.5, 2)
@@ -165,6 +285,7 @@ async def predict(req: PredictRequest):
         model_version=prediction["model_version"],
         inference_ms=prediction["inference_ms"],
         face_detected=result.face_found,
+        calibrated=_calibration["calibrated"],
         model_score=blended["model_score"],
         au_score=blended["au_score"],
         au_weights_applied=blended["au_weights_applied"],

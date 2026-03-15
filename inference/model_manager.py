@@ -163,44 +163,49 @@ class ModelManager:
 
         return self._interpret_output(raw_output)
 
+    def is_comparative(self) -> bool:
+        """Check if model is a comparative model (needs target + reference)."""
+        return self.meta.get("comparative", False)
+
     def _interpret_output(self, raw_output: np.ndarray) -> dict:
         """
         Interpret model output into pain score and confidence.
 
-        Handles two common output formats:
-        1. Classification: softmax over N classes → map to 0-10 scale
-        2. Regression: single float → clip to 0-10
-
-        The FER+ emotion model outputs 8 classes (neutral, happiness, surprise,
-        sadness, anger, disgust, fear, contempt). We map negative emotions
-        to higher pain scores as a baseline heuristic until a pain-specific
-        model is available.
+        Handles three output formats:
+        1. Comparative (40 outputs): extract PSPI from metadata-specified index
+        2. Classification (N classes): softmax → map to 0-10 scale
+        3. Regression (single float): clip to 0-10
         """
         output = raw_output.flatten()
+
+        # Comparative model — extract PSPI using metadata
+        if self.is_comparative() and "pspi_index" in self.meta:
+            pspi_index = self.meta["pspi_index"]
+            pspi_max = self.meta.get("pspi_max", 16)
+            raw_pspi = float(output[pspi_index])
+            pspi_clamped = max(0.0, min(pspi_max, raw_pspi))
+            score = round(pspi_clamped * (10.0 / pspi_max), 2)
+            confidence = 0.8
+            return {"score": score, "confidence": confidence, "raw_output": output.tolist()}
 
         if len(output) == 1:
             # Regression model — single score
             score = float(np.clip(output[0], 0, 10))
-            confidence = 0.8  # Default confidence for regression
+            confidence = 0.8
             return {"score": round(score, 2), "confidence": confidence, "raw_output": output.tolist()}
 
         # Classification model — softmax probabilities
-        # Apply softmax if not already probabilities
         if np.any(output < 0) or np.sum(output) < 0.99 or np.sum(output) > 1.01:
             exp_output = np.exp(output - np.max(output))
             probs = exp_output / exp_output.sum()
         else:
             probs = output
 
-        # For emotion models (8 classes): map to pain
-        # neutral=0, happy=1, surprise=2, sad=3, anger=4, disgust=5, fear=6, contempt=7
-        # Pain mapping: negative emotions → higher pain scores
         if len(probs) == 8:
             pain_weights = np.array([0.0, 0.0, 1.0, 4.0, 6.0, 7.0, 8.0, 3.0])
             score = float(np.dot(probs, pain_weights))
-            confidence = float(1.0 - probs[0] - probs[1])  # confidence = 1 - P(neutral) - P(happy)
+            confidence = float(1.0 - probs[0] - probs[1])
         else:
-            # Generic classification: weighted average of class indices scaled to 0-10
             n_classes = len(probs)
             class_scores = np.linspace(0, 10, n_classes)
             score = float(np.dot(probs, class_scores))

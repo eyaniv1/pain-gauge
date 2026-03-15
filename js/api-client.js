@@ -131,6 +131,19 @@ const PainGaugeAPI = (function () {
         return await request('GET', '/api/inference/status');
     }
 
+    // ── AI Calibration ──────────────────────────────────
+
+    async function calibrateAI(imageBase64, painLevel) {
+        return await request('POST', '/api/inference/calibrate', {
+            image: imageBase64,
+            pain_level: painLevel,
+        });
+    }
+
+    async function clearAICalibration() {
+        return await request('POST', '/api/inference/clear-calibration');
+    }
+
     // ── Frame URL helper ───────────────────────────────────
 
     function frameUrl(filename) {
@@ -157,6 +170,8 @@ const PainGaugeAPI = (function () {
         sendSamples,
         correctSample,
         getInferenceStatus,
+        calibrateAI,
+        clearAICalibration,
         frameUrl,
     };
 })();
