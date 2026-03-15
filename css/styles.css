@@ -1023,32 +1023,33 @@ footer {
         align-items: center;
     }
 
-    /* Row 1: just the title */
+    /* Row 1: title + patient selector right-aligned */
     header h1 {
         font-size: 15px;
         order: 0;
-        flex: 1;
     }
 
-    /* Line break after title */
+    .patient-selector {
+        order: 1;
+        margin-left: auto;
+    }
+
+    /* Line break after row 1 */
     .header-spacer {
         display: block;
         flex-basis: 100%;
         height: 0;
-        order: 1;
+        order: 2;
     }
 
-    /* Row 2: all buttons + patient selector, no wrapping */
+    /* Row 2: action buttons + source toggles + flip camera + settings */
     #start-btn, #end-btn { order: 10; }
     #recalibrate-btn { order: 11; }
     #camera-btn { order: 12; }
     #load-video-btn { order: 13; }
-    #settings-btn { order: 14; }
-
-    .patient-selector {
-        order: 15;
-        margin-left: auto;
-    }
+    #flip-camera-btn { order: 14; }
+    #settings-btn { order: 15; }
+    .ai-status-dot { order: 16; }
 
     header .btn-small {
         padding: 5px 8px;
