@@ -57,6 +57,10 @@ class SessionChart {
         this.samples.push({ time: elapsed, score });
     }
 
+    addAiSample(time, score) {
+        this.aiSamples.push({ time, score });
+    }
+
     /** Load historical samples from backend (array of { timestamp_ms, score, ai_score }) */
     loadSamples(samples, title) {
         this.isRecording = false;

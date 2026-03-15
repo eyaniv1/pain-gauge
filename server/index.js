@@ -367,7 +367,17 @@ app.post('/api/sessions/:id/samples', async (req, res) => {
     }
 
     insertSamplesBatch(rows);
-    res.status(201).json({ inserted: rows.length });
+
+    // Return AI scores so the client can plot them in real time
+    const aiResults = rows
+        .filter(r => r.ai_score != null)
+        .map(r => ({
+            timestamp_ms: r.timestamp_ms,
+            ai_score: r.ai_score,
+            ai_confidence: r.ai_confidence,
+        }));
+
+    res.status(201).json({ inserted: rows.length, ai_results: aiResults });
 });
 
 // ── API Routes: Sample Correction ─────────────────────────

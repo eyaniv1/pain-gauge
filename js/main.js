@@ -519,7 +519,14 @@
     async function flushSamples() {
         if (!currentSessionId || sampleBuffer.length === 0) return;
         const batch = sampleBuffer.splice(0);
-        await PainGaugeAPI.sendSamples(currentSessionId, batch);
+        const result = await PainGaugeAPI.sendSamples(currentSessionId, batch);
+
+        // Feed AI scores back to the chart for real-time plotting
+        if (result && result.ai_results) {
+            for (const ai of result.ai_results) {
+                chart.addAiSample(ai.timestamp_ms / 1000, ai.ai_score);
+            }
+        }
     }
 
     // ── Session chart sampling ────────────────────────────────────
