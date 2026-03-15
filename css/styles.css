@@ -971,41 +971,50 @@ footer {
         align-items: center;
     }
 
+    /* Row 1: just the title */
     header h1 {
         font-size: 15px;
         order: 0;
+        flex: 1;
     }
 
-    .patient-selector {
-        order: 1;
-        margin-left: auto;
-    }
-
-    /* Use header-spacer as a line break between rows */
+    /* Line break after title */
     .header-spacer {
         display: block;
         flex-basis: 100%;
         height: 0;
-        order: 5;
+        order: 1;
     }
 
-    /* Row 2: action buttons, left-aligned */
-    #start-btn, #end-btn {
-        order: 10;
-    }
+    /* Row 2: all buttons + patient selector, no wrapping */
+    #start-btn, #end-btn { order: 10; }
     #recalibrate-btn { order: 11; }
     #camera-btn { order: 12; }
     #load-video-btn { order: 13; }
     #settings-btn { order: 14; }
 
+    .patient-selector {
+        order: 15;
+        margin-left: auto;
+    }
+
     header .btn-small {
-        padding: 5px 10px;
+        padding: 5px 8px;
         font-size: 11px;
+        white-space: nowrap;
     }
 
     header .btn-source,
     header #settings-btn {
         padding: 6px;
+    }
+
+    #patient-select {
+        max-width: 120px;
+    }
+
+    #add-patient-btn {
+        padding: 4px 6px;
     }
 
     /* Main */
