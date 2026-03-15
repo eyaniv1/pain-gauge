@@ -10,8 +10,8 @@ sprints:
     end_date: "2026-03-28"
     capacity_points: 13
     committed_points: 12
-    completed_points: 3
-    status: "in_progress"
+    completed_points: 12
+    status: "completed"
     goal: "Stand up Python inference service with model loading, preprocessing, and start.bat integration"
     stories:
       - story_id: "STORY-001"
@@ -22,18 +22,18 @@ sprints:
       - story_id: "STORY-002"
         title: "Model Manager — Load Pre-trained Model"
         points: 5
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-003"
         title: "Image Preprocessing Pipeline"
         points: 3
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-012"
         title: "Update start.bat"
         points: 1
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
 
   - sprint_number: 2
     start_date: "2026-03-31"
@@ -121,7 +121,7 @@ sprints:
         assigned_to: null
 
 velocity:
-  sprint_1: null
+  sprint_1: 12
   sprint_2: null
   sprint_3: null
   sprint_4: null

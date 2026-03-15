@@ -5,6 +5,7 @@ httpx>=0.28
 numpy>=2.0
 onnxruntime>=1.18
 opencv-python-headless>=4.10
+mediapipe>=0.10.20
 pytest>=8.0
 pytest-asyncio>=0.25
 onnx>=1.16
