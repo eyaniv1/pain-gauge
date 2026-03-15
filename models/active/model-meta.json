@@ -1,8 +1,10 @@
 {
-    "version": "ferplus-v8",
+    "version": "pain-unbc-v1",
     "format": "onnx",
-    "description": "FERPlus emotion recognition model (8 classes) with pain mapping. Emotions mapped: neutral=0, happy=0, surprise=1, sad=4, anger=6, disgust=7, fear=8, contempt=3",
-    "trained_on": "FER+ dataset (facial emotion recognition)",
-    "input": "1x1x64x64 grayscale",
-    "notes": "Baseline model — not pain-specific. Negative emotions are mapped to higher pain scores as a heuristic. Replace with a pain-trained model for better accuracy."
+    "description": "Pain detection model trained on UNBC-McMaster Shoulder Pain Expression Archive. Outputs PSPI pain score normalized to 0-10 scale.",
+    "trained_on": "UNBC-McMaster (subjects 66, 80, 97, 108, 121 excluded from training)",
+    "source": "TaatiTeam/pain_detection_demo (converted from PyTorch with zero-reference wrapper)",
+    "input": "1x1x160x160 grayscale",
+    "output": "Single regression value (0-10 pain score)",
+    "notes": "Original model is comparative (target + reference frame). Wrapped with zero-reference for single-image inference. Subject-specific calibration not available in this mode."
 }
