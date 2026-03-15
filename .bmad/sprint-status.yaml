@@ -70,25 +70,25 @@ sprints:
     end_date: "2026-04-25"
     capacity_points: 13
     committed_points: 12
-    completed_points: 0
-    status: "not_started"
+    completed_points: 12
+    status: "completed"
     goal: "Training pipeline and dataset tooling for model improvement"
     stories:
       - story_id: "STORY-007"
         title: "UNBC-McMaster Dataset Loader"
         points: 5
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-008"
         title: "Model Fine-tuning Script"
         points: 5
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-006"
         title: "Model Listing and Switching API"
         points: 2
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
 
   - sprint_number: 4
     start_date: "2026-04-28"
@@ -123,7 +123,7 @@ sprints:
 velocity:
   sprint_1: 12
   sprint_2: 15
-  sprint_3: null
+  sprint_3: 12
   sprint_4: null
   rolling_average: null
 
