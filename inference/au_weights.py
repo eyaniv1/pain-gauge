@@ -62,25 +62,48 @@ def reload_config():
     return _load_config()
 
 
+def _normalize_au_keys(au_data: dict) -> dict:
+    """
+    Map client AU key formats to canonical AU names.
+
+    Client sends: { au4: 0.8, au6_7: 0.3, au9_10: 0.5, au43: 0.2 }
+    We need:      { AU4: 0.8, AU6: 0.3, AU7: 0.3, AU9: 0.5, AU10: 0.5, AU43: 0.2 }
+    """
+    normalized = {}
+    for key, value in au_data.items():
+        upper = key.upper().replace("_", "")
+        # Handle combined AUs (au6_7 → AU6 + AU7, au9_10 → AU9 + AU10)
+        if upper in ("AU67", "AU6_7"):
+            normalized["AU6"] = value
+            normalized["AU7"] = value
+        elif upper in ("AU910", "AU9_10"):
+            normalized["AU9"] = value
+            normalized["AU10"] = value
+        else:
+            normalized[upper] = value
+    return normalized
+
+
 def compute_au_score(au_data: dict[str, float]) -> float:
     """
     Compute a weighted AU-based pain score from AU intensities.
 
     Args:
         au_data: Dict of AU name → intensity (0.0 to 1.0).
-                 e.g., {"AU4": 0.8, "AU6": 0.3, "AU9": 0.5}
+                 Accepts both canonical (AU4) and client (au4, au6_7) key formats.
 
     Returns:
         Pain score on 0-10 scale based on weighted AU intensities.
     """
     config = _load_config()
     weights = config["weights"]
+    mapped = _normalize_au_keys(au_data)
 
     weighted_sum = 0.0
     total_weight = 0.0
 
     for au_name, weight in weights.items():
-        intensity = au_data.get(au_name, 0.0)
+        intensity = mapped.get(au_name, 0.0)
         # Clamp intensity to [0, 1]
         intensity = max(0.0, min(1.0, float(intensity)))
         weighted_sum += intensity * weight
