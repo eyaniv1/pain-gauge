@@ -23,7 +23,12 @@ class SessionChart {
 
         // Colors
         this.pspiColor = '#2980b9';   // blue for PSPI
-        this.aiColor = '#c0392b';     // red for AI
+        this.aiColor = 'rgba(192, 57, 43, 0.5)';  // dimmer red for AI
+
+        // Zoom
+        this.zoomLevels = [30, 60, 120, 300, 600]; // seconds
+        this.zoomIndex = 2; // default 120s
+        this.maxVisibleSeconds = this.zoomLevels[this.zoomIndex];
 
         // Animation
         this._animFrame = null;
@@ -232,8 +237,8 @@ class SessionChart {
             ctx.closePath();
 
             const aiGradient = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
-            aiGradient.addColorStop(0, 'rgba(192, 57, 43, 0.15)');
-            aiGradient.addColorStop(1, 'rgba(192, 57, 43, 0.02)');
+            aiGradient.addColorStop(0, 'rgba(192, 57, 43, 0.08)');
+            aiGradient.addColorStop(1, 'rgba(192, 57, 43, 0.01)');
             ctx.fillStyle = aiGradient;
             ctx.fill();
 
@@ -353,6 +358,25 @@ class SessionChart {
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
+    }
+
+    zoomIn() {
+        if (this.zoomIndex > 0) {
+            this.zoomIndex--;
+            this.maxVisibleSeconds = this.zoomLevels[this.zoomIndex];
+        }
+    }
+
+    zoomOut() {
+        if (this.zoomIndex < this.zoomLevels.length - 1) {
+            this.zoomIndex++;
+            this.maxVisibleSeconds = this.zoomLevels[this.zoomIndex];
+        }
+    }
+
+    getZoomLabel() {
+        const s = this.maxVisibleSeconds;
+        return s >= 60 ? `${s / 60}m` : `${s}s`;
     }
 
     _formatTime(seconds) {

@@ -142,6 +142,17 @@
     const gauge = new PainGauge('gauge');
     const chart = new SessionChart('session-chart');
 
+    // ── Chart zoom controls ──────────────────────────────────────
+    const zoomLabel = document.getElementById('chart-zoom-label');
+    document.getElementById('chart-zoom-in').addEventListener('click', () => {
+        chart.zoomIn();
+        zoomLabel.textContent = chart.getZoomLabel();
+    });
+    document.getElementById('chart-zoom-out').addEventListener('click', () => {
+        chart.zoomOut();
+        zoomLabel.textContent = chart.getZoomLabel();
+    });
+
     // ── Settings panel logic ─────────────────────────────────────
 
     settingsBtn.addEventListener('click', () => {
