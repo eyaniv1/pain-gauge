@@ -448,27 +448,23 @@ main {
 
 .chart-zoom-controls {
     position: absolute;
-    bottom: 8px;
-    left: 56px;
+    bottom: 48px;
+    right: 10px;
     display: flex;
-    align-items: center;
-    gap: 4px;
-    background: rgba(255, 255, 255, 0.85);
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 2px 6px;
+    flex-direction: column;
     z-index: 5;
+    border-radius: 2px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
 }
 
 .chart-zoom-btn {
     width: 32px;
     height: 32px;
-    border: 1px solid #bbb;
-    border-radius: 4px;
+    border: none;
     background: #fff;
     font-size: 18px;
-    font-weight: bold;
-    color: #555;
+    color: #666;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -477,16 +473,16 @@ main {
     -webkit-tap-highlight-color: transparent;
 }
 
-.chart-zoom-btn:active {
-    background: #e8e8e8;
+.chart-zoom-btn:first-child {
+    border-bottom: 1px solid #e6e6e6;
 }
 
-.chart-zoom-label {
-    font-size: 12px;
-    color: #666;
-    min-width: 28px;
-    text-align: center;
-    user-select: none;
+.chart-zoom-btn:hover {
+    color: #333;
+}
+
+.chart-zoom-btn:active {
+    background: #e8e8e8;
 }
 
 /* ── Video Container (in main screen) ────────────────────── */
