@@ -40,30 +40,30 @@ sprints:
     end_date: "2026-04-11"
     capacity_points: 13
     committed_points: 15
-    completed_points: 0
-    status: "not_started"
+    completed_points: 15
+    status: "completed"
     goal: "Connect inference to live session pipeline — AI scores flowing end-to-end"
     stories:
       - story_id: "STORY-004"
         title: "Predict Endpoint — Frame to Score"
         points: 5
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-005"
         title: "AU-Weighted Pain Scoring"
         points: 3
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-010"
         title: "Database Schema Migration"
         points: 2
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-011"
         title: "Node.js Inference Proxy"
         points: 5
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
 
   - sprint_number: 3
     start_date: "2026-04-14"
@@ -122,7 +122,7 @@ sprints:
 
 velocity:
   sprint_1: 12
-  sprint_2: null
+  sprint_2: 15
   sprint_3: null
   sprint_4: null
   rolling_average: null

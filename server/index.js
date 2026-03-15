@@ -14,6 +14,12 @@ const Database = require('better-sqlite3');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const INFERENCE_URL = process.env.INFERENCE_URL || 'http://127.0.0.1:5000';
+
+// ── Inference Service State ───────────────────────────────
+
+let inferenceStatus = { online: false, lastCheck: 0, detail: null };
+const INFERENCE_CACHE_MS = 30000; // Cache health status for 30 seconds
 
 // ── Middleware ──────────────────────────────────────────────
 
@@ -70,6 +76,27 @@ db.exec(`
     CREATE INDEX IF NOT EXISTS idx_samples_session ON samples(session_id);
 `);
 
+// ── AI Column Migration ──────────────────────────────────
+// Add AI-related columns to samples table (idempotent)
+
+const aiColumns = [
+    { name: 'ai_score', type: 'REAL' },
+    { name: 'ai_confidence', type: 'REAL' },
+    { name: 'model_version', type: 'TEXT' },
+    { name: 'corrected_score', type: 'REAL' },
+    { name: 'corrected_by', type: 'TEXT' },
+    { name: 'corrected_at', type: 'TEXT' },
+];
+
+const existingColumns = db.pragma('table_info(samples)').map(c => c.name);
+for (const col of aiColumns) {
+    if (!existingColumns.includes(col.name)) {
+        db.exec(`ALTER TABLE samples ADD COLUMN ${col.name} ${col.type}`);
+    }
+}
+
+db.exec('CREATE INDEX IF NOT EXISTS idx_samples_corrected ON samples(corrected_score)');
+
 // ── Prepared statements ────────────────────────────────────
 
 const stmts = {
@@ -89,15 +116,65 @@ const stmts = {
 
     // Samples
     listSamples: db.prepare('SELECT * FROM samples WHERE session_id = ? ORDER BY timestamp_ms'),
-    insertSample: db.prepare('INSERT INTO samples (session_id, timestamp_ms, score, raw_score, pspi, sensor_data, frame_filename) VALUES (?, ?, ?, ?, ?, ?, ?)'),
+    insertSample: db.prepare('INSERT INTO samples (session_id, timestamp_ms, score, raw_score, pspi, sensor_data, frame_filename, ai_score, ai_confidence, model_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+    correctSample: db.prepare('UPDATE samples SET corrected_score = ?, corrected_by = ?, corrected_at = ? WHERE id = ?'),
+    getSample: db.prepare('SELECT * FROM samples WHERE id = ?'),
 };
 
 // Batch insert samples in a transaction
 const insertSamplesBatch = db.transaction((samples) => {
     for (const s of samples) {
-        stmts.insertSample.run(s.session_id, s.timestamp_ms, s.score, s.raw_score, s.pspi, s.sensor_data, s.frame_filename);
+        stmts.insertSample.run(
+            s.session_id, s.timestamp_ms, s.score, s.raw_score, s.pspi,
+            s.sensor_data, s.frame_filename,
+            s.ai_score || null, s.ai_confidence || null, s.model_version || null
+        );
     }
 });
+
+// ── Inference Service Helpers ──────────────────────────────
+
+async function checkInferenceHealth() {
+    const now = Date.now();
+    if (now - inferenceStatus.lastCheck < INFERENCE_CACHE_MS) {
+        return inferenceStatus;
+    }
+
+    try {
+        const resp = await fetch(`${INFERENCE_URL}/health`, {
+            signal: AbortSignal.timeout(2000),
+        });
+        const data = await resp.json();
+        inferenceStatus = { online: true, lastCheck: now, detail: data };
+    } catch {
+        inferenceStatus = { online: false, lastCheck: now, detail: null };
+    }
+    return inferenceStatus;
+}
+
+async function requestInference(imageBase64, sensorData) {
+    try {
+        const body = { image: imageBase64 };
+        if (sensorData) {
+            // Pass AU data if available in sensor_data
+            const parsed = typeof sensorData === 'string' ? JSON.parse(sensorData) : sensorData;
+            if (parsed.au) body.au_data = parsed.au;
+        }
+
+        const resp = await fetch(`${INFERENCE_URL}/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(2000),
+        });
+
+        if (!resp.ok) return null;
+        return await resp.json();
+    } catch (err) {
+        console.warn(`Inference request failed: ${err.message}`);
+        return null;
+    }
+}
 
 // ── API Routes: Patients ───────────────────────────────────
 
@@ -222,7 +299,7 @@ app.get('/api/sessions/:id/samples', (req, res) => {
     })));
 });
 
-app.post('/api/sessions/:id/samples', (req, res) => {
+app.post('/api/sessions/:id/samples', async (req, res) => {
     const session = stmts.getSession.get(req.params.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
 
@@ -232,12 +309,16 @@ app.post('/api/sessions/:id/samples', (req, res) => {
     const rows = [];
     for (const sample of samples) {
         let frameFilename = null;
+        let aiResult = null;
 
         // Save frame image if provided (base64 JPEG)
         if (sample.frame) {
             frameFilename = `${req.params.id}_${sample.timestamp_ms}.jpg`;
             const buffer = Buffer.from(sample.frame.replace(/^data:image\/\w+;base64,/, ''), 'base64');
             fs.writeFileSync(path.join(FRAMES_DIR, frameFilename), buffer);
+
+            // Request AI inference (non-blocking for the batch, but sequential per sample)
+            aiResult = await requestInference(sample.frame, sample.sensor_data);
         }
 
         rows.push({
@@ -248,6 +329,9 @@ app.post('/api/sessions/:id/samples', (req, res) => {
             pspi: sample.pspi || null,
             sensor_data: sample.sensor_data ? JSON.stringify(sample.sensor_data) : null,
             frame_filename: frameFilename,
+            ai_score: aiResult ? aiResult.ai_score : null,
+            ai_confidence: aiResult ? aiResult.confidence : null,
+            model_version: aiResult ? aiResult.model_version : null,
         });
     }
 
@@ -255,10 +339,41 @@ app.post('/api/sessions/:id/samples', (req, res) => {
     res.status(201).json({ inserted: rows.length });
 });
 
+// ── API Routes: Sample Correction ─────────────────────────
+
+app.put('/api/samples/:id/correct', (req, res) => {
+    const sample = stmts.getSample.get(req.params.id);
+    if (!sample) return res.status(404).json({ error: 'Sample not found' });
+
+    const { corrected_score, corrected_by } = req.body;
+    if (corrected_score === undefined || corrected_score === null) {
+        return res.status(400).json({ error: 'corrected_score is required' });
+    }
+
+    const corrected_at = new Date().toISOString();
+    stmts.correctSample.run(corrected_score, corrected_by || null, corrected_at, req.params.id);
+    res.json(stmts.getSample.get(req.params.id));
+});
+
 // ── Health check ───────────────────────────────────────────
 
-app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', patients: stmts.listPatients.all().length });
+app.get('/api/health', async (req, res) => {
+    const inference = await checkInferenceHealth();
+    res.json({
+        status: 'ok',
+        patients: stmts.listPatients.all().length,
+        inference_online: inference.online,
+    });
+});
+
+app.get('/api/inference/status', async (req, res) => {
+    const inference = await checkInferenceHealth();
+    res.json({
+        online: inference.online,
+        url: INFERENCE_URL,
+        detail: inference.detail,
+        last_check: inference.lastCheck ? new Date(inference.lastCheck).toISOString() : null,
+    });
 });
 
 // ── Start server ───────────────────────────────────────────

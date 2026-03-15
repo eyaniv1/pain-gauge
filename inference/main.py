@@ -13,7 +13,9 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 import config
+from au_weights import blend_scores
 from model_manager import ModelManager
+from preprocessing import preprocess
 
 
 manager = ModelManager()
@@ -74,6 +76,22 @@ class ActivateResponse(BaseModel):
     active_model: str | None = None
 
 
+class PredictRequest(BaseModel):
+    image: str  # base64-encoded image
+    au_data: dict | None = None  # optional AU data from face-api.js
+
+
+class PredictResponse(BaseModel):
+    ai_score: float
+    confidence: float
+    model_version: str | None = None
+    inference_ms: float = 0.0
+    face_detected: bool = True
+    model_score: float | None = None
+    au_score: float | None = None
+    au_weights_applied: dict | None = None
+
+
 # ── Endpoints ─────────────────────────────────────────────
 
 @app.get("/health", response_model=HealthResponse)
@@ -100,6 +118,49 @@ async def activate_model(req: ActivateRequest):
     if not loaded:
         raise HTTPException(status_code=404, detail=f"Could not load model from: {req.path}")
     return ActivateResponse(ok=True, active_model=manager.version)
+
+
+@app.post("/predict", response_model=PredictResponse)
+async def predict(req: PredictRequest):
+    # Check model is loaded
+    if not manager.loaded:
+        raise HTTPException(status_code=503, detail="No model loaded")
+
+    # Determine target size from model's expected input
+    status = manager.get_status()
+    input_shape = status.get("input_shape")
+    if input_shape and len(input_shape) == 4:
+        # Shape is (batch, channels, height, width)
+        target_size = (input_shape[3], input_shape[2])  # (width, height)
+    else:
+        target_size = (224, 224)
+
+    # Preprocess image — try with face detection, fall back to full image
+    result = preprocess(req.image, target_size=target_size, require_face=False)
+    if result is None:
+        raise HTTPException(status_code=400, detail="Invalid image data")
+
+    # Run inference
+    prediction = manager.predict(result.image_array)
+
+    # Blend with AU data if provided
+    blended = blend_scores(prediction["score"], req.au_data)
+
+    # Lower confidence when no face was detected
+    confidence = prediction["confidence"]
+    if not result.face_found:
+        confidence = round(confidence * 0.5, 2)
+
+    return PredictResponse(
+        ai_score=blended["final_score"],
+        confidence=confidence,
+        model_version=prediction["model_version"],
+        inference_ms=prediction["inference_ms"],
+        face_detected=result.face_found,
+        model_score=blended["model_score"],
+        au_score=blended["au_score"],
+        au_weights_applied=blended["au_weights_applied"],
+    )
 
 
 if __name__ == "__main__":

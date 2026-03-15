@@ -1,0 +1,12 @@
+{
+    "weights": {
+        "AU4": 0.35,
+        "AU6": 0.10,
+        "AU7": 0.10,
+        "AU9": 0.15,
+        "AU10": 0.15,
+        "AU43": 0.15
+    },
+    "blend_alpha": 0.6,
+    "description": "AU-zone weights from MDPI pain detection research (92.72% accuracy). blend_alpha controls model vs AU balance: final = alpha*model + (1-alpha)*au_weighted"
+}
