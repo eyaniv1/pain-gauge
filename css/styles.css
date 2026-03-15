@@ -964,9 +964,8 @@ footer {
     }
 
     header {
-        display: grid;
-        grid-template-columns: auto 1fr;
-        grid-template-rows: auto auto;
+        display: flex;
+        flex-wrap: wrap;
         padding: 8px 10px;
         gap: 4px 6px;
         align-items: center;
@@ -974,33 +973,30 @@ footer {
 
     header h1 {
         font-size: 15px;
-        grid-column: 1;
-        grid-row: 1;
+        order: 0;
     }
 
     .patient-selector {
-        grid-column: 2;
-        grid-row: 1;
-        justify-self: end;
+        order: 1;
+        margin-left: auto;
     }
 
+    /* Use header-spacer as a line break between rows */
     .header-spacer {
-        display: none;
+        display: block;
+        flex-basis: 100%;
+        height: 0;
+        order: 5;
     }
 
-    /* All action buttons go to row 2, left-aligned */
-    #start-btn, #end-btn, #recalibrate-btn,
-    #camera-btn, #load-video-btn, #settings-btn {
-        grid-row: 2;
-    }
-
+    /* Row 2: action buttons, left-aligned */
     #start-btn, #end-btn {
-        order: 0;
+        order: 10;
     }
-    #recalibrate-btn { order: 1; }
-    #camera-btn { order: 2; }
-    #load-video-btn { order: 3; }
-    #settings-btn { order: 4; }
+    #recalibrate-btn { order: 11; }
+    #camera-btn { order: 12; }
+    #load-video-btn { order: 13; }
+    #settings-btn { order: 14; }
 
     header .btn-small {
         padding: 5px 10px;
