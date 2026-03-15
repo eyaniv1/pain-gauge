@@ -1,0 +1,13 @@
+version: "6.0.0"
+project_name: "Pain Gauge AI Engine"
+project_level: 2
+last_updated: "2026-03-15"
+
+workflows:
+  product-brief: "skipped"
+  prd: "docs/prd-pain-gauge-ai-engine-2026-03-15.md"
+  architecture: "docs/architecture-pain-gauge-ai-engine-2026-03-15.md"
+  sprint-planning: "docs/sprint-plan-pain-gauge-ai-engine-2026-03-15.md"
+
+current_phase: "implementation"
+next_recommended: "dev-story STORY-001"

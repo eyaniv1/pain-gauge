@@ -1,0 +1,133 @@
+version: "6.0.0"
+project_name: "Pain Gauge AI Engine"
+project_level: 2
+current_sprint: 1
+sprint_plan_path: "docs/sprint-plan-pain-gauge-ai-engine-2026-03-15.md"
+
+sprints:
+  - sprint_number: 1
+    start_date: "2026-03-17"
+    end_date: "2026-03-28"
+    capacity_points: 13
+    committed_points: 12
+    completed_points: 3
+    status: "in_progress"
+    goal: "Stand up Python inference service with model loading, preprocessing, and start.bat integration"
+    stories:
+      - story_id: "STORY-001"
+        title: "Python Service Scaffold"
+        points: 3
+        status: "completed"
+        assigned_to: "Eran"
+      - story_id: "STORY-002"
+        title: "Model Manager — Load Pre-trained Model"
+        points: 5
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-003"
+        title: "Image Preprocessing Pipeline"
+        points: 3
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-012"
+        title: "Update start.bat"
+        points: 1
+        status: "not_started"
+        assigned_to: null
+
+  - sprint_number: 2
+    start_date: "2026-03-31"
+    end_date: "2026-04-11"
+    capacity_points: 13
+    committed_points: 15
+    completed_points: 0
+    status: "not_started"
+    goal: "Connect inference to live session pipeline — AI scores flowing end-to-end"
+    stories:
+      - story_id: "STORY-004"
+        title: "Predict Endpoint — Frame to Score"
+        points: 5
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-005"
+        title: "AU-Weighted Pain Scoring"
+        points: 3
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-010"
+        title: "Database Schema Migration"
+        points: 2
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-011"
+        title: "Node.js Inference Proxy"
+        points: 5
+        status: "not_started"
+        assigned_to: null
+
+  - sprint_number: 3
+    start_date: "2026-04-14"
+    end_date: "2026-04-25"
+    capacity_points: 13
+    committed_points: 12
+    completed_points: 0
+    status: "not_started"
+    goal: "Training pipeline and dataset tooling for model improvement"
+    stories:
+      - story_id: "STORY-007"
+        title: "UNBC-McMaster Dataset Loader"
+        points: 5
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-008"
+        title: "Model Fine-tuning Script"
+        points: 5
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-006"
+        title: "Model Listing and Switching API"
+        points: 2
+        status: "not_started"
+        assigned_to: null
+
+  - sprint_number: 4
+    start_date: "2026-04-28"
+    end_date: "2026-05-09"
+    capacity_points: 13
+    committed_points: 9
+    completed_points: 0
+    status: "not_started"
+    goal: "Clinical UI enhancements — dual scoring, corrections, status indicator"
+    stories:
+      - story_id: "STORY-013"
+        title: "Dual Score Display — Live Session"
+        points: 3
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-014"
+        title: "Clinician Score Correction UI"
+        points: 3
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-015"
+        title: "AI Status Indicator in Header"
+        points: 1
+        status: "not_started"
+        assigned_to: null
+      - story_id: "STORY-009"
+        title: "Export Corrections for Training"
+        points: 2
+        status: "not_started"
+        assigned_to: null
+
+velocity:
+  sprint_1: null
+  sprint_2: null
+  sprint_3: null
+  sprint_4: null
+  rolling_average: null
+
+team:
+  size: 1
+  sprint_length_weeks: 2
+  capacity_per_sprint: 13
