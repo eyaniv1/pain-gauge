@@ -1,0 +1,8 @@
+{
+    "version": "0.0.0",
+    "format": "onnx",
+    "description": "Placeholder — replace with a real pain detection model",
+    "trained_on": "none",
+    "accuracy": null,
+    "notes": "Place a .onnx or .pt model file in this directory to enable AI inference"
+}
