@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pain Gauge - Real-Time Pain Monitor</title>
-    <link rel="stylesheet" href="css/styles.css?v=3">
+    <link rel="stylesheet" href="css/styles.css?v=4">
 </head>
 <body>
 
@@ -149,7 +149,8 @@
             <section class="left-panel">
                 <div class="view-tabs">
                     <button type="button" class="view-tab active" onclick="switchView(0)">Camera</button>
-                    <button type="button" class="view-tab" onclick="switchView(1)">History</button>
+                    <button type="button" class="view-tab" onclick="switchView(1)">Chart</button>
+                    <button type="button" class="view-tab" onclick="switchView(2)">History</button>
                 </div>
 
                 <div class="panels-container">
@@ -160,8 +161,63 @@
                             <div id="no-face-warning-main" class="hidden">No face detected</div>
                         </div>
                     </div>
-                    <div class="view-panel" id="panel-history">
+                    <div class="view-panel" id="panel-chart">
                         <canvas id="session-chart"></canvas>
+                    </div>
+                    <div class="view-panel" id="panel-history">
+                        <!-- Session list view -->
+                        <div class="history-container" id="history-sessions-view">
+                            <div class="history-toolbar">
+                                <button type="button" class="btn btn-small" id="history-refresh-btn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                                    Refresh
+                                </button>
+                                <button type="button" class="btn btn-small btn-danger" id="history-delete-btn" disabled>
+                                    Delete Selected
+                                </button>
+                            </div>
+                            <div class="history-table-wrap" id="history-table-wrap">
+                                <table class="history-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-check"><input type="checkbox" id="history-select-all"></th>
+                                            <th>Session</th>
+                                            <th>Date &amp; Time</th>
+                                            <th>Duration</th>
+                                            <th>Samples</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-sessions-tbody"></tbody>
+                                </table>
+                                <div class="history-empty hidden" id="history-empty">No sessions found for this patient.</div>
+                            </div>
+                        </div>
+                        <!-- Sample detail view -->
+                        <div class="history-container hidden" id="history-samples-view">
+                            <div class="history-toolbar">
+                                <button type="button" class="btn btn-small" id="history-back-btn">&larr; Back</button>
+                                <span class="history-session-title" id="history-session-title"></span>
+                                <button type="button" class="btn btn-small" id="history-view-chart-btn">View Chart</button>
+                            </div>
+                            <div class="history-table-wrap">
+                                <table class="history-table history-table-samples">
+                                    <thead>
+                                        <tr>
+                                            <th>Time</th>
+                                            <th>Score</th>
+                                            <th>PSPI</th>
+                                            <th>AU4</th>
+                                            <th>AU6/7</th>
+                                            <th>AU9/10</th>
+                                            <th>AU43</th>
+                                            <th>Frame</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="history-samples-tbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -221,6 +277,17 @@
         </div>
     </div>
 
+    <!-- Frame Viewer Modal -->
+    <div class="modal-overlay hidden" id="frame-modal">
+        <div class="modal frame-modal">
+            <div class="frame-modal-header">
+                <span id="frame-modal-title">Frame</span>
+                <button type="button" class="btn btn-small" id="frame-modal-close">&times;</button>
+            </div>
+            <img id="frame-modal-img" src="" alt="Captured frame">
+        </div>
+    </div>
+
     <!-- Tab switching (standalone) -->
     <script>
         function switchView(index) {
@@ -239,10 +306,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
     <!-- Application -->
-    <script src="js/pain-engine.js?v=3"></script>
-    <script src="js/gauge.js?v=3"></script>
-    <script src="js/session-chart.js?v=3"></script>
-    <script src="js/api-client.js?v=3"></script>
-    <script src="js/main.js?v=3"></script>
+    <script src="js/pain-engine.js?v=4"></script>
+    <script src="js/gauge.js?v=4"></script>
+    <script src="js/session-chart.js?v=4"></script>
+    <script src="js/api-client.js?v=4"></script>
+    <script src="js/main.js?v=4"></script>
 </body>
 </html>

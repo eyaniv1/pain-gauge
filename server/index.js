@@ -190,6 +190,28 @@ app.delete('/api/sessions/:id', (req, res) => {
     res.json({ ok: true });
 });
 
+// Batch delete sessions
+app.post('/api/sessions/batch-delete', (req, res) => {
+    const { session_ids } = req.body;
+    if (!Array.isArray(session_ids)) return res.status(400).json({ error: 'session_ids array required' });
+
+    const deleteMany = db.transaction((ids) => {
+        for (const id of ids) {
+            const samples = stmts.listSamples.all(id);
+            for (const s of samples) {
+                if (s.frame_filename) {
+                    const framePath = path.join(FRAMES_DIR, s.frame_filename);
+                    if (fs.existsSync(framePath)) fs.unlinkSync(framePath);
+                }
+            }
+            stmts.deleteSession.run(id);
+        }
+    });
+
+    deleteMany(session_ids);
+    res.json({ ok: true, deleted: session_ids.length });
+});
+
 // ── API Routes: Samples ────────────────────────────────────
 
 app.get('/api/sessions/:id/samples', (req, res) => {

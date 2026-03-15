@@ -232,6 +232,7 @@
         updateConnectionStatus();
         if (PainGaugeAPI.isConnected()) {
             await loadPatients();
+            loadHistorySessions();
         }
     }
 
@@ -255,6 +256,9 @@
     patientSelect.addEventListener('change', () => {
         currentPatientId = patientSelect.value;
         localStorage.setItem('painGaugePatientId', currentPatientId);
+        // Clear chart and reload history for new patient
+        chart.resetRecording();
+        loadHistorySessions();
     });
 
     addPatientBtn.addEventListener('click', () => {
@@ -493,6 +497,7 @@
         }
 
         switchView(1);
+        loadHistorySessions();
     }
 
     async function flushSamples() {
@@ -712,6 +717,212 @@
             cancelAnimationFrame(videoLoopId);
             videoLoopId = null;
         }
+    }
+
+    // ── History Panel ──────────────────────────────────────────
+
+    const historySessionsView = document.getElementById('history-sessions-view');
+    const historySamplesView = document.getElementById('history-samples-view');
+    const historySessionsTbody = document.getElementById('history-sessions-tbody');
+    const historySamplesTbody = document.getElementById('history-samples-tbody');
+    const historyRefreshBtn = document.getElementById('history-refresh-btn');
+    const historyDeleteBtn = document.getElementById('history-delete-btn');
+    const historySelectAll = document.getElementById('history-select-all');
+    const historyBackBtn = document.getElementById('history-back-btn');
+    const historySessionTitle = document.getElementById('history-session-title');
+    const historyViewChartBtn = document.getElementById('history-view-chart-btn');
+    const historyEmpty = document.getElementById('history-empty');
+
+    // Frame viewer modal
+    const frameModal = document.getElementById('frame-modal');
+    const frameModalImg = document.getElementById('frame-modal-img');
+    const frameModalTitle = document.getElementById('frame-modal-title');
+    const frameModalClose = document.getElementById('frame-modal-close');
+
+    let historySessions = [];
+    let historySelectedIds = new Set();
+    let currentHistorySamples = [];
+
+    historyRefreshBtn.addEventListener('click', () => loadHistorySessions());
+
+    historySelectAll.addEventListener('change', () => {
+        const checked = historySelectAll.checked;
+        historySelectedIds.clear();
+        if (checked) {
+            historySessions.forEach(s => historySelectedIds.add(s.id));
+        }
+        historySessionsTbody.querySelectorAll('.session-check').forEach(cb => {
+            cb.checked = checked;
+        });
+        updateDeleteBtn();
+    });
+
+    historyDeleteBtn.addEventListener('click', async () => {
+        if (historySelectedIds.size === 0) return;
+        const count = historySelectedIds.size;
+        if (!confirm(`Delete ${count} session${count > 1 ? 's' : ''}? This cannot be undone.`)) return;
+        const ids = Array.from(historySelectedIds);
+        await PainGaugeAPI.deleteSessions(ids);
+        historySelectedIds.clear();
+        historySelectAll.checked = false;
+        await loadHistorySessions();
+    });
+
+    historyBackBtn.addEventListener('click', () => {
+        historySamplesView.classList.add('hidden');
+        historySessionsView.classList.remove('hidden');
+    });
+
+    historyViewChartBtn.addEventListener('click', () => {
+        if (currentHistorySamples.length > 0) {
+            chart.loadSamples(currentHistorySamples, historySessionTitle.textContent);
+            switchView(1);
+        }
+    });
+
+    frameModalClose.addEventListener('click', () => {
+        frameModal.classList.add('hidden');
+    });
+    frameModal.addEventListener('click', (e) => {
+        if (e.target === frameModal) frameModal.classList.add('hidden');
+    });
+
+    function updateDeleteBtn() {
+        historyDeleteBtn.disabled = historySelectedIds.size === 0;
+    }
+
+    async function loadHistorySessions() {
+        historySessionsTbody.innerHTML = '';
+        historySelectedIds.clear();
+        historySelectAll.checked = false;
+        updateDeleteBtn();
+
+        if (!PainGaugeAPI.isConnected() || !currentPatientId) {
+            historyEmpty.classList.remove('hidden');
+            historyEmpty.textContent = !currentPatientId ? 'Select a patient to view history.' : 'Backend not connected.';
+            return;
+        }
+
+        historySessions = await PainGaugeAPI.listSessions(currentPatientId);
+        if (historySessions.length === 0) {
+            historyEmpty.classList.remove('hidden');
+            historyEmpty.textContent = 'No sessions found for this patient.';
+            return;
+        }
+        historyEmpty.classList.add('hidden');
+
+        for (const s of historySessions) {
+            const tr = document.createElement('tr');
+
+            const startDate = new Date(s.start_time);
+            const endDate = s.end_time ? new Date(s.end_time) : null;
+            const duration = endDate ? formatDuration(endDate - startDate) : 'In progress';
+            const shortId = s.id.substring(0, 8);
+
+            tr.innerHTML = `
+                <td class="col-check"><input type="checkbox" class="session-check" data-id="${s.id}"></td>
+                <td><span class="session-link" data-id="${s.id}">${shortId}</span></td>
+                <td>${formatDateTime(startDate)}</td>
+                <td>${duration}</td>
+                <td class="sample-count" data-id="${s.id}">...</td>
+                <td><span class="session-link" data-id="${s.id}" style="font-size:11px">View</span></td>
+            `;
+
+            // Checkbox handler
+            tr.querySelector('.session-check').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    historySelectedIds.add(s.id);
+                } else {
+                    historySelectedIds.delete(s.id);
+                }
+                historySelectAll.checked = historySelectedIds.size === historySessions.length;
+                updateDeleteBtn();
+            });
+
+            // Session link handlers
+            tr.querySelectorAll('.session-link').forEach(link => {
+                link.addEventListener('click', () => loadHistorySamples(s));
+            });
+
+            historySessionsTbody.appendChild(tr);
+
+            // Load sample count async
+            PainGaugeAPI.getSamples(s.id).then(samples => {
+                const cell = historySessionsTbody.querySelector(`.sample-count[data-id="${s.id}"]`);
+                if (cell) cell.textContent = samples.length;
+            });
+        }
+    }
+
+    async function loadHistorySamples(session) {
+        historySessionsView.classList.add('hidden');
+        historySamplesView.classList.remove('hidden');
+
+        const startDate = new Date(session.start_time);
+        historySessionTitle.textContent = `Session ${session.id.substring(0, 8)} — ${formatDateTime(startDate)}`;
+
+        historySamplesTbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999">Loading...</td></tr>';
+
+        const samples = await PainGaugeAPI.getSamples(session.id);
+        currentHistorySamples = samples;
+        historySamplesTbody.innerHTML = '';
+
+        if (samples.length === 0) {
+            historySamplesTbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999">No samples</td></tr>';
+            return;
+        }
+
+        // Also load into chart
+        chart.loadSamples(samples, `Session ${session.id.substring(0, 8)}`);
+
+        for (const s of samples) {
+            const tr = document.createElement('tr');
+            const face = s.sensor_data && s.sensor_data.face ? s.sensor_data.face : {};
+            const timeStr = formatMs(s.timestamp_ms);
+
+            tr.innerHTML = `
+                <td>${timeStr}</td>
+                <td>${s.score != null ? s.score.toFixed(1) : '-'}</td>
+                <td>${s.pspi != null ? s.pspi.toFixed(2) : '-'}</td>
+                <td>${face.au4 != null ? face.au4.toFixed(1) : '-'}</td>
+                <td>${face.au6_7 != null ? face.au6_7.toFixed(1) : '-'}</td>
+                <td>${face.au9_10 != null ? face.au9_10.toFixed(1) : '-'}</td>
+                <td>${face.au43 != null ? face.au43.toFixed(1) : '-'}</td>
+                <td>${s.frame_filename ? '<span class="frame-link" data-frame="' + s.frame_filename + '" data-time="' + timeStr + '">View</span>' : '-'}</td>
+            `;
+
+            // Frame click handler
+            const frameLink = tr.querySelector('.frame-link');
+            if (frameLink) {
+                frameLink.addEventListener('click', () => {
+                    frameModalImg.src = PainGaugeAPI.frameUrl(frameLink.dataset.frame);
+                    frameModalTitle.textContent = `Frame at ${frameLink.dataset.time}`;
+                    frameModal.classList.remove('hidden');
+                });
+            }
+
+            historySamplesTbody.appendChild(tr);
+        }
+    }
+
+    // ── History helpers ────────────────────────────────────────
+
+    function formatDateTime(date) {
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDuration(ms) {
+        const totalSec = Math.floor(ms / 1000);
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
+    }
+
+    function formatMs(ms) {
+        const totalSec = Math.round(ms / 1000);
+        const m = Math.floor(totalSec / 60);
+        const s = totalSec % 60;
+        return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
     // ── Initialize ───────────────────────────────────────────────

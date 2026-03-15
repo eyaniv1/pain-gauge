@@ -40,12 +40,28 @@ class SessionChart {
         this.startTime = null;
         this.stoppedElapsed = null;
         this.isRecording = false;
+        this.chartTitle = null;
     }
 
     addSample(score) {
         if (!this.isRecording || this.startTime === null) return;
         const elapsed = (performance.now() - this.startTime) / 1000;
         this.samples.push({ time: elapsed, score });
+    }
+
+    /** Load historical samples from backend (array of { timestamp_ms, score }) */
+    loadSamples(samples, title) {
+        this.isRecording = false;
+        this.startTime = null;
+        this.stoppedElapsed = null;
+        this.chartTitle = title || 'Session Pain History';
+        this.samples = samples.map(s => ({
+            time: s.timestamp_ms / 1000,
+            score: s.score,
+        }));
+        if (this.samples.length > 0) {
+            this.stoppedElapsed = this.samples[this.samples.length - 1].time;
+        }
     }
 
     getElapsedTime() {
@@ -211,7 +227,7 @@ class SessionChart {
         ctx.font = '14px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText('Session Pain History', chartX, 8);
+        ctx.fillText(this.chartTitle || 'Session Pain History', chartX, 8);
 
         // Stats (if recording)
         if (this.samples.length > 0) {
@@ -242,7 +258,7 @@ class SessionChart {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(
-                this.isRecording ? 'Waiting for data...' : 'Calibrate to start recording',
+                this.isRecording ? 'Waiting for data...' : 'Start a session or select one from History',
                 chartX + chartW / 2,
                 chartY + chartH / 2
             );

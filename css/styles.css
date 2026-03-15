@@ -797,6 +797,159 @@ footer {
     color: #fff;
 }
 
+/* ── History Panel ───────────────────────────────────────── */
+
+#panel-history {
+    background: #fafafa;
+    display: flex;
+    flex-direction: column;
+}
+
+.history-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.history-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e0e0e0;
+    background: #fff;
+    flex-shrink: 0;
+}
+
+.history-toolbar svg {
+    vertical-align: middle;
+}
+
+.history-session-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.history-table-wrap {
+    flex: 1;
+    overflow: auto;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.history-table th,
+.history-table td {
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+    white-space: nowrap;
+}
+
+.history-table th {
+    background: #f5f5f5;
+    font-weight: 600;
+    color: #555;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.history-table tbody tr:hover {
+    background: #f0f4ff;
+}
+
+.history-table .col-check {
+    width: 30px;
+    text-align: center;
+}
+
+.history-table .col-check input {
+    cursor: pointer;
+}
+
+.history-table .session-link {
+    color: #2980b9;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.history-table .session-link:hover {
+    color: #1a5276;
+}
+
+.history-table .frame-link {
+    color: #2980b9;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.history-table .frame-link:hover {
+    color: #1a5276;
+    text-decoration: underline;
+}
+
+.history-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+    font-size: 14px;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: #fff;
+    border-color: #c0392b;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #c0392b;
+}
+
+.btn-danger:disabled {
+    background: #f5f5f5;
+    color: #999;
+    border-color: #ddd;
+}
+
+/* ── Frame Viewer Modal ─────────────────────────────────── */
+
+.frame-modal {
+    max-width: 600px;
+    padding: 0;
+    overflow: hidden;
+}
+
+.frame-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-bottom: 1px solid #eee;
+}
+
+.frame-modal-header span {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+}
+
+#frame-modal-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: #000;
+}
+
 /* ── Responsive ──────────────────────────────────────────── */
 
 @media (max-width: 900px) {
@@ -860,7 +1013,28 @@ footer {
 
     .panels-container {
         flex: none;
-        height: 56vw;
+        height: auto;
+        min-height: 56vw;
+    }
+
+    #panel-history.active {
+        position: relative;
+        min-height: 300px;
+    }
+
+    .history-table {
+        font-size: 11px;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 5px 6px;
+    }
+
+    .history-table-samples td,
+    .history-table-samples th {
+        padding: 4px 5px;
+        font-size: 10px;
     }
 
     .gauge-panel {

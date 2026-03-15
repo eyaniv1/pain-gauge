@@ -102,6 +102,10 @@ const PainGaugeAPI = (function () {
         return await request('DELETE', '/api/sessions/' + sessionId);
     }
 
+    async function deleteSessions(sessionIds) {
+        return await request('POST', '/api/sessions/batch-delete', { session_ids: sessionIds });
+    }
+
     // ── Samples ────────────────────────────────────────────
 
     async function getSamples(sessionId) {
@@ -133,6 +137,7 @@ const PainGaugeAPI = (function () {
         getSession,
         endSession,
         deleteSession,
+        deleteSessions,
         getSamples,
         sendSamples,
         frameUrl,
