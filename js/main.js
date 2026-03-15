@@ -861,14 +861,14 @@
         const startDate = new Date(session.start_time);
         historySessionTitle.textContent = `Session ${session.id.substring(0, 8)} — ${formatDateTime(startDate)}`;
 
-        historySamplesTbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999">Loading...</td></tr>';
+        historySamplesTbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999">Loading...</td></tr>';
 
         const samples = await PainGaugeAPI.getSamples(session.id);
         currentHistorySamples = samples;
         historySamplesTbody.innerHTML = '';
 
         if (samples.length === 0) {
-            historySamplesTbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999">No samples</td></tr>';
+            historySamplesTbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999">No samples</td></tr>';
             return;
         }
 
@@ -880,10 +880,30 @@
             const face = s.sensor_data && s.sensor_data.face ? s.sensor_data.face : {};
             const timeStr = formatMs(s.timestamp_ms);
 
+            // AI score badge with confidence coloring
+            let aiScoreHtml = '-';
+            if (s.ai_score != null) {
+                const conf = s.ai_confidence || 0;
+                const confClass = conf > 0.7 ? 'high-confidence' : conf > 0.5 ? 'med-confidence' : 'low-confidence';
+                aiScoreHtml = `<span class="ai-score-badge ${confClass}">${s.ai_score.toFixed(1)}</span>`;
+            }
+
+            // Correction cell with edit button
+            let correctionHtml;
+            if (s.corrected_score != null) {
+                correctionHtml = `<span class="corrected-value">${s.corrected_score.toFixed(1)}</span>`;
+            } else {
+                correctionHtml = `<button class="correct-btn" data-sample-id="${s.id}" title="Correct this score">Edit</button>`;
+            }
+
+            if (s.corrected_score != null) tr.classList.add('sample-corrected');
+
             tr.innerHTML = `
                 <td>${timeStr}</td>
                 <td>${s.score != null ? s.score.toFixed(1) : '-'}</td>
                 <td>${s.pspi != null ? s.pspi.toFixed(2) : '-'}</td>
+                <td>${aiScoreHtml}</td>
+                <td class="correction-cell">${correctionHtml}</td>
                 <td>${face.au4 != null ? face.au4.toFixed(1) : '-'}</td>
                 <td>${face.au6_7 != null ? face.au6_7.toFixed(1) : '-'}</td>
                 <td>${face.au9_10 != null ? face.au9_10.toFixed(1) : '-'}</td>
@@ -898,6 +918,48 @@
                     frameModalImg.src = PainGaugeAPI.frameUrl(frameLink.dataset.frame);
                     frameModalTitle.textContent = `Frame at ${frameLink.dataset.time}`;
                     frameModal.classList.remove('hidden');
+                });
+            }
+
+            // Correction button handler
+            const correctBtn = tr.querySelector('.correct-btn');
+            if (correctBtn) {
+                correctBtn.addEventListener('click', async () => {
+                    const sampleId = correctBtn.dataset.sampleId;
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.min = '0';
+                    input.max = '10';
+                    input.step = '0.1';
+                    input.value = s.ai_score != null ? s.ai_score.toFixed(1) : s.score.toFixed(1);
+                    input.className = 'correction-input';
+
+                    const cell = correctBtn.parentElement;
+                    cell.innerHTML = '';
+                    cell.appendChild(input);
+                    input.focus();
+                    input.select();
+
+                    async function submitCorrection() {
+                        const val = parseFloat(input.value);
+                        if (isNaN(val) || val < 0 || val > 10) {
+                            cell.innerHTML = correctionHtml;
+                            return;
+                        }
+                        const result = await PainGaugeAPI.correctSample(sampleId, val);
+                        if (result) {
+                            cell.innerHTML = `<span class="corrected-value">${val.toFixed(1)}</span>`;
+                            tr.classList.add('sample-corrected');
+                        } else {
+                            cell.innerHTML = correctionHtml;
+                        }
+                    }
+
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') submitCorrection();
+                        if (e.key === 'Escape') cell.innerHTML = correctionHtml;
+                    });
+                    input.addEventListener('blur', submitCorrection);
                 });
             }
 
@@ -925,8 +987,39 @@
         return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
+    // ── AI Status Polling ─────────────────────────────────────────
+
+    const aiStatusDot = document.getElementById('ai-status-dot');
+    let aiStatusInterval = null;
+
+    async function pollAIStatus() {
+        if (!PainGaugeAPI.isConnected()) {
+            if (aiStatusDot) {
+                aiStatusDot.className = 'ai-status-dot offline';
+                aiStatusDot.title = 'AI: Backend not connected';
+            }
+            return;
+        }
+        const status = await PainGaugeAPI.getInferenceStatus();
+        if (aiStatusDot) {
+            if (status && status.online) {
+                aiStatusDot.className = 'ai-status-dot online';
+                aiStatusDot.title = 'AI: Online' + (status.detail && status.detail.model_version ? ` (${status.detail.model_version})` : '');
+            } else {
+                aiStatusDot.className = 'ai-status-dot offline';
+                aiStatusDot.title = 'AI: Offline';
+            }
+        }
+    }
+
+    function startAIStatusPolling() {
+        pollAIStatus();
+        aiStatusInterval = setInterval(pollAIStatus, 30000);
+    }
+
     // ── Initialize ───────────────────────────────────────────────
 
     initBackend();
     startCamera();
+    startAIStatusPolling();
 })();

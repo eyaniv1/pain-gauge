@@ -116,6 +116,21 @@ const PainGaugeAPI = (function () {
         return await request('POST', '/api/sessions/' + sessionId + '/samples', { samples });
     }
 
+    // ── Sample Correction ──────────────────────────────────
+
+    async function correctSample(sampleId, correctedScore, correctedBy) {
+        return await request('PUT', '/api/samples/' + sampleId + '/correct', {
+            corrected_score: correctedScore,
+            corrected_by: correctedBy || 'clinician',
+        });
+    }
+
+    // ── Inference Status ──────────────────────────────────
+
+    async function getInferenceStatus() {
+        return await request('GET', '/api/inference/status');
+    }
+
     // ── Frame URL helper ───────────────────────────────────
 
     function frameUrl(filename) {
@@ -140,6 +155,8 @@ const PainGaugeAPI = (function () {
         deleteSessions,
         getSamples,
         sendSamples,
+        correctSample,
+        getInferenceStatus,
         frameUrl,
     };
 })();

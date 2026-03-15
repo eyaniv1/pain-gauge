@@ -2,6 +2,7 @@
  * Session History Chart
  *
  * Canvas-based line chart that records and displays pain scores over time.
+ * Supports dual lines: PSPI (blue) and AI score (red) with legend.
  * Recording starts after calibration and runs until stopped.
  */
 
@@ -12,12 +13,17 @@ class SessionChart {
 
         // Data
         this.samples = [];       // { time: seconds, score: 0-10 }
+        this.aiSamples = [];     // { time: seconds, score: 0-10 } — AI scores
         this.isRecording = false;
         this.startTime = null;
         this.maxVisibleSeconds = 120; // 2 minutes visible window, scrolls
 
         // Layout
         this.padding = { top: 30, right: 20, bottom: 40, left: 50 };
+
+        // Colors
+        this.pspiColor = '#2980b9';   // blue for PSPI
+        this.aiColor = '#c0392b';     // red for AI
 
         // Animation
         this._animFrame = null;
@@ -26,6 +32,7 @@ class SessionChart {
 
     startRecording() {
         this.samples = [];
+        this.aiSamples = [];
         this.startTime = performance.now();
         this.isRecording = true;
     }
@@ -37,6 +44,7 @@ class SessionChart {
 
     resetRecording() {
         this.samples = [];
+        this.aiSamples = [];
         this.startTime = null;
         this.stoppedElapsed = null;
         this.isRecording = false;
@@ -49,7 +57,7 @@ class SessionChart {
         this.samples.push({ time: elapsed, score });
     }
 
-    /** Load historical samples from backend (array of { timestamp_ms, score }) */
+    /** Load historical samples from backend (array of { timestamp_ms, score, ai_score }) */
     loadSamples(samples, title) {
         this.isRecording = false;
         this.startTime = null;
@@ -59,6 +67,13 @@ class SessionChart {
             time: s.timestamp_ms / 1000,
             score: s.score,
         }));
+        // Extract AI samples (only where ai_score exists)
+        this.aiSamples = samples
+            .filter(s => s.ai_score != null)
+            .map(s => ({
+                time: s.timestamp_ms / 1000,
+                score: s.ai_score,
+            }));
         if (this.samples.length > 0) {
             this.stoppedElapsed = this.samples[this.samples.length - 1].time;
         }
@@ -111,11 +126,11 @@ class SessionChart {
 
         // Pain zone bands (horizontal)
         const zones = [
-            { from: 0, to: 2, color: 'rgba(255,255,255,0.8)', label: '' },
-            { from: 2, to: 4, color: 'rgba(255,220,220,0.5)', label: '' },
-            { from: 4, to: 6, color: 'rgba(255,180,180,0.5)', label: '' },
-            { from: 6, to: 8, color: 'rgba(255,120,120,0.4)', label: '' },
-            { from: 8, to: 10, color: 'rgba(255,60,60,0.3)', label: '' },
+            { from: 0, to: 2, color: 'rgba(255,255,255,0.8)' },
+            { from: 2, to: 4, color: 'rgba(255,220,220,0.5)' },
+            { from: 4, to: 6, color: 'rgba(255,180,180,0.5)' },
+            { from: 6, to: 8, color: 'rgba(255,120,120,0.4)' },
+            { from: 8, to: 10, color: 'rgba(255,60,60,0.3)' },
         ];
 
         for (const zone of zones) {
@@ -127,7 +142,6 @@ class SessionChart {
 
         // Time range
         const elapsed = this.getElapsedTime();
-        const maxTime = Math.max(this.maxVisibleSeconds, elapsed);
         const timeStart = elapsed > this.maxVisibleSeconds ? elapsed - this.maxVisibleSeconds : 0;
         const timeEnd = Math.max(this.maxVisibleSeconds, elapsed);
 
@@ -165,11 +179,13 @@ class SessionChart {
             ctx.fillText(this._formatTime(t), x, chartY + chartH + 6);
         }
 
-        // Plot data
+        // Plot PSPI data (blue)
         const visibleSamples = this.samples.filter(s => s.time >= timeStart && s.time <= timeEnd);
+        const hasAI = this.aiSamples.length > 0;
+        const visibleAI = hasAI ? this.aiSamples.filter(s => s.time >= timeStart && s.time <= timeEnd) : [];
 
         if (visibleSamples.length > 1) {
-            // Filled area under curve
+            // Filled area under PSPI curve
             ctx.beginPath();
             const firstX = chartX + ((visibleSamples[0].time - timeStart) / timeSpan) * chartW;
             ctx.moveTo(firstX, chartY + chartH);
@@ -185,36 +201,40 @@ class SessionChart {
             ctx.closePath();
 
             const gradient = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
-            gradient.addColorStop(0, 'rgba(220, 50, 50, 0.3)');
-            gradient.addColorStop(1, 'rgba(220, 50, 50, 0.02)');
+            gradient.addColorStop(0, 'rgba(41, 128, 185, 0.2)');
+            gradient.addColorStop(1, 'rgba(41, 128, 185, 0.02)');
             ctx.fillStyle = gradient;
             ctx.fill();
 
-            // Line
+            // PSPI Line
+            this._drawLine(ctx, visibleSamples, chartX, chartY, chartH, timeStart, timeSpan, this.pspiColor);
+        }
+
+        // Plot AI data (red) — only when we have AI samples
+        if (visibleAI.length > 1) {
+            // Filled area under AI curve
             ctx.beginPath();
-            for (let i = 0; i < visibleSamples.length; i++) {
-                const s = visibleSamples[i];
+            const firstAIX = chartX + ((visibleAI[0].time - timeStart) / timeSpan) * chartW;
+            ctx.moveTo(firstAIX, chartY + chartH);
+
+            for (const s of visibleAI) {
                 const x = chartX + ((s.time - timeStart) / timeSpan) * chartW;
                 const y = chartY + chartH - (s.score / 10) * chartH;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
+                ctx.lineTo(x, y);
             }
-            ctx.strokeStyle = '#c0392b';
-            ctx.lineWidth = 2;
-            ctx.lineJoin = 'round';
-            ctx.stroke();
 
-            // Current value dot
-            const last = visibleSamples[visibleSamples.length - 1];
-            const dotX = chartX + ((last.time - timeStart) / timeSpan) * chartW;
-            const dotY = chartY + chartH - (last.score / 10) * chartH;
-            ctx.beginPath();
-            ctx.arc(dotX, dotY, 5, 0, 2 * Math.PI);
-            ctx.fillStyle = '#c0392b';
+            const lastAIX = chartX + ((visibleAI[visibleAI.length - 1].time - timeStart) / timeSpan) * chartW;
+            ctx.lineTo(lastAIX, chartY + chartH);
+            ctx.closePath();
+
+            const aiGradient = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
+            aiGradient.addColorStop(0, 'rgba(192, 57, 43, 0.15)');
+            aiGradient.addColorStop(1, 'rgba(192, 57, 43, 0.02)');
+            ctx.fillStyle = aiGradient;
             ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+
+            // AI Line
+            this._drawLine(ctx, visibleAI, chartX, chartY, chartH, timeStart, timeSpan, this.aiColor);
         }
 
         // Chart border
@@ -229,16 +249,54 @@ class SessionChart {
         ctx.textBaseline = 'top';
         ctx.fillText(this.chartTitle || 'Session Pain History', chartX, 8);
 
-        // Stats (if recording)
+        // Legend (when AI data present)
+        if (hasAI) {
+            const legendX = chartX + chartW - 150;
+            const legendY = 6;
+            ctx.font = '11px "Segoe UI", Arial, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+
+            // PSPI legend
+            ctx.strokeStyle = this.pspiColor;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(legendX, legendY + 6);
+            ctx.lineTo(legendX + 20, legendY + 6);
+            ctx.stroke();
+            ctx.fillStyle = '#555';
+            ctx.fillText('PSPI', legendX + 24, legendY);
+
+            // AI legend
+            ctx.strokeStyle = this.aiColor;
+            ctx.beginPath();
+            ctx.moveTo(legendX + 65, legendY + 6);
+            ctx.lineTo(legendX + 85, legendY + 6);
+            ctx.stroke();
+            ctx.fillStyle = '#555';
+            ctx.fillText('AI', legendX + 89, legendY);
+        }
+
+        // Stats
         if (this.samples.length > 0) {
             const scores = this.samples.map(s => s.score);
             const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
             const max = Math.max(...scores);
-            const statsText = `Avg: ${avg.toFixed(1)}  |  Peak: ${max.toFixed(1)}  |  Duration: ${this._formatTime(elapsed)}`;
+            let statsText = `PSPI Avg: ${avg.toFixed(1)}  Peak: ${max.toFixed(1)}`;
+
+            if (this.aiSamples.length > 0) {
+                const aiScores = this.aiSamples.map(s => s.score);
+                const aiAvg = aiScores.reduce((a, b) => a + b, 0) / aiScores.length;
+                const aiMax = Math.max(...aiScores);
+                statsText += `  |  AI Avg: ${aiAvg.toFixed(1)}  Peak: ${aiMax.toFixed(1)}`;
+            }
+
+            statsText += `  |  ${this._formatTime(elapsed)}`;
+
             ctx.textAlign = 'right';
             ctx.fillStyle = '#888';
-            ctx.font = '12px "Segoe UI", Arial, sans-serif';
-            ctx.fillText(statsText, chartX + chartW, 10);
+            ctx.font = '11px "Segoe UI", Arial, sans-serif';
+            ctx.fillText(statsText, chartX + chartW, chartY + chartH + 24);
         }
 
         // Y-axis label
@@ -263,6 +321,34 @@ class SessionChart {
                 chartY + chartH / 2
             );
         }
+    }
+
+    _drawLine(ctx, data, chartX, chartY, chartH, timeStart, timeSpan, color) {
+        const chartW = this._displayWidth - this.padding.left - this.padding.right;
+        ctx.beginPath();
+        for (let i = 0; i < data.length; i++) {
+            const s = data[i];
+            const x = chartX + ((s.time - timeStart) / timeSpan) * chartW;
+            const y = chartY + chartH - (s.score / 10) * chartH;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // Current value dot
+        const last = data[data.length - 1];
+        const dotX = chartX + ((last.time - timeStart) / timeSpan) * chartW;
+        const dotY = chartY + chartH - (last.score / 10) * chartH;
+        ctx.beginPath();
+        ctx.arc(dotX, dotY, 4, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
     }
 
     _formatTime(seconds) {

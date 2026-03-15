@@ -95,37 +95,37 @@ sprints:
     end_date: "2026-05-09"
     capacity_points: 13
     committed_points: 9
-    completed_points: 0
-    status: "not_started"
+    completed_points: 9
+    status: "completed"
     goal: "Clinical UI enhancements — dual scoring, corrections, status indicator"
     stories:
       - story_id: "STORY-013"
         title: "Dual Score Display — Live Session"
         points: 3
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-014"
         title: "Clinician Score Correction UI"
         points: 3
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-015"
         title: "AI Status Indicator in Header"
         points: 1
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
       - story_id: "STORY-009"
         title: "Export Corrections for Training"
         points: 2
-        status: "not_started"
-        assigned_to: null
+        status: "completed"
+        assigned_to: "Eran"
 
 velocity:
   sprint_1: 12
   sprint_2: 15
   sprint_3: 12
-  sprint_4: null
-  rolling_average: null
+  sprint_4: 9
+  rolling_average: 12
 
 team:
   size: 1
