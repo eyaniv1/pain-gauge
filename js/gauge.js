@@ -10,21 +10,41 @@ class PainGauge {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
-
-        // Gauge geometry
-        this.cx = this.canvas.width / 2;
-        this.cy = this.canvas.height - 40;
-        this.radius = 150;
-        this.startAngle = Math.PI;           // left (180°)
-        this.endAngle = 2 * Math.PI;        // right (360°), sweeping upward through top
+        this.startAngle = Math.PI;
+        this.endAngle = 2 * Math.PI;
 
         // Animation
         this.displayScore = 0;
         this.targetScore = 0;
         this.animationSpeed = 0.12;
 
+        // Responsive sizing
+        this._resize();
+        this._resizeObserver = new ResizeObserver(() => this._resize());
+        this._resizeObserver.observe(this.canvas.parentElement);
+
         // Start render loop
         this._animate();
+    }
+
+    _resize() {
+        const parent = this.canvas.parentElement;
+        const w = Math.min(400, parent ? parent.clientWidth : 400);
+        const h = Math.round(w * 0.7);
+        const dpr = window.devicePixelRatio || 1;
+        this.canvas.width = w * dpr;
+        this.canvas.height = h * dpr;
+        this.canvas.style.width = w + 'px';
+        this.canvas.style.height = h + 'px';
+        this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        // Scale factor relative to reference width of 400
+        this.s = w / 400;
+
+        // Recompute geometry based on size
+        this.cx = w / 2;
+        this.cy = h - (h * 0.14);
+        this.radius = w * 0.375;
     }
 
     /**
@@ -58,7 +78,10 @@ class PainGauge {
 
     _drawArc() {
         const ctx = this.ctx;
+        const s = this.s;
         const segments = 100;
+        const arcWidth = 30 * s;
+        const half = arcWidth / 2;
 
         for (let i = 0; i < segments; i++) {
             const t1 = i / segments;
@@ -67,25 +90,24 @@ class PainGauge {
             const a2 = this.startAngle + (this.endAngle - this.startAngle) * t2;
             const value = t1 * 10;
 
-            // Thick colored arc
             ctx.beginPath();
             ctx.arc(this.cx, this.cy, this.radius, a1, a2);
             ctx.strokeStyle = PainGauge.painColor(value);
-            ctx.lineWidth = 30;
+            ctx.lineWidth = arcWidth;
             ctx.lineCap = 'butt';
             ctx.stroke();
         }
 
         // Outer border
         ctx.beginPath();
-        ctx.arc(this.cx, this.cy, this.radius + 15, this.startAngle, this.endAngle, false);
+        ctx.arc(this.cx, this.cy, this.radius + half, this.startAngle, this.endAngle, false);
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 1;
         ctx.stroke();
 
         // Inner border
         ctx.beginPath();
-        ctx.arc(this.cx, this.cy, this.radius - 15, this.startAngle, this.endAngle, false);
+        ctx.arc(this.cx, this.cy, this.radius - half, this.startAngle, this.endAngle, false);
         ctx.strokeStyle = '#333';
         ctx.lineWidth = 1;
         ctx.stroke();
@@ -93,6 +115,7 @@ class PainGauge {
 
     _drawTicks() {
         const ctx = this.ctx;
+        const s = this.s;
 
         for (let i = 0; i <= 10; i++) {
             const t = i / 10;
@@ -101,8 +124,8 @@ class PainGauge {
             const sin = Math.sin(angle);
 
             // Major tick
-            const innerR = this.radius - 20;
-            const outerR = this.radius + 20;
+            const innerR = this.radius - 20 * s;
+            const outerR = this.radius + 20 * s;
             ctx.beginPath();
             ctx.moveTo(this.cx + innerR * cos, this.cy + innerR * sin);
             ctx.lineTo(this.cx + outerR * cos, this.cy + outerR * sin);
@@ -111,9 +134,9 @@ class PainGauge {
             ctx.stroke();
 
             // Label
-            const labelR = this.radius + 32;
+            const labelR = this.radius + 32 * s;
             ctx.fillStyle = '#333';
-            ctx.font = '14px "Segoe UI", Arial, sans-serif';
+            ctx.font = `${Math.round(14 * s)}px "Segoe UI", Arial, sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(i.toString(), this.cx + labelR * cos, this.cy + labelR * sin);
@@ -125,8 +148,8 @@ class PainGauge {
                 const hCos = Math.cos(halfAngle);
                 const hSin = Math.sin(halfAngle);
                 ctx.beginPath();
-                ctx.moveTo(this.cx + (this.radius - 17) * hCos, this.cy + (this.radius - 17) * hSin);
-                ctx.lineTo(this.cx + (this.radius + 17) * hCos, this.cy + (this.radius + 17) * hSin);
+                ctx.moveTo(this.cx + (this.radius - 17 * s) * hCos, this.cy + (this.radius - 17 * s) * hSin);
+                ctx.lineTo(this.cx + (this.radius + 17 * s) * hCos, this.cy + (this.radius + 17 * s) * hSin);
                 ctx.strokeStyle = '#999';
                 ctx.lineWidth = 1;
                 ctx.stroke();
@@ -136,6 +159,7 @@ class PainGauge {
 
     _drawNeedle(score) {
         const ctx = this.ctx;
+        const s = this.s;
         const t = score / 10;
         const angle = this.startAngle + (this.endAngle - this.startAngle) * t;
         const cos = Math.cos(angle);
@@ -144,17 +168,18 @@ class PainGauge {
         // Needle shadow
         ctx.save();
         ctx.shadowColor = 'rgba(0,0,0,0.3)';
-        ctx.shadowBlur = 6;
-        ctx.shadowOffsetX = 2;
-        ctx.shadowOffsetY = 2;
+        ctx.shadowBlur = 6 * s;
+        ctx.shadowOffsetX = 2 * s;
+        ctx.shadowOffsetY = 2 * s;
 
         // Needle body
         ctx.beginPath();
-        ctx.moveTo(this.cx + (this.radius - 25) * cos, this.cy + (this.radius - 25) * sin);
+        ctx.moveTo(this.cx + (this.radius - 25 * s) * cos, this.cy + (this.radius - 25 * s) * sin);
         const perpCos = Math.cos(angle + Math.PI / 2);
         const perpSin = Math.sin(angle + Math.PI / 2);
-        ctx.lineTo(this.cx + 6 * perpCos, this.cy + 6 * perpSin);
-        ctx.lineTo(this.cx - 6 * perpCos, this.cy - 6 * perpSin);
+        const needleHalf = 6 * s;
+        ctx.lineTo(this.cx + needleHalf * perpCos, this.cy + needleHalf * perpSin);
+        ctx.lineTo(this.cx - needleHalf * perpCos, this.cy - needleHalf * perpSin);
         ctx.closePath();
         ctx.fillStyle = '#222';
         ctx.fill();
@@ -163,7 +188,7 @@ class PainGauge {
 
         // Center cap
         ctx.beginPath();
-        ctx.arc(this.cx, this.cy, 10, 0, 2 * Math.PI);
+        ctx.arc(this.cx, this.cy, 10 * s, 0, 2 * Math.PI);
         ctx.fillStyle = '#444';
         ctx.fill();
         ctx.strokeStyle = '#222';
@@ -173,24 +198,25 @@ class PainGauge {
 
     _drawDigitalReadout(score) {
         const ctx = this.ctx;
+        const s = this.s;
 
         // Score number
         ctx.fillStyle = PainGauge.painColor(score);
-        ctx.font = 'bold 48px "Segoe UI", Arial, sans-serif';
+        ctx.font = `bold ${Math.round(48 * s)}px "Segoe UI", Arial, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(score.toFixed(1), this.cx, this.cy - 50);
+        ctx.fillText(score.toFixed(1), this.cx, this.cy - 50 * s);
 
         // Label
         ctx.fillStyle = '#666';
-        ctx.font = '14px "Segoe UI", Arial, sans-serif';
-        ctx.fillText('PAIN LEVEL', this.cx, this.cy - 80);
+        ctx.font = `${Math.round(14 * s)}px "Segoe UI", Arial, sans-serif`;
+        ctx.fillText('PAIN LEVEL', this.cx, this.cy - 80 * s);
 
         // Severity text
         const severity = PainGauge.getSeverityLabel(score);
         ctx.fillStyle = PainGauge.painColor(score);
-        ctx.font = '16px "Segoe UI", Arial, sans-serif';
-        ctx.fillText(severity, this.cx, this.cy - 20);
+        ctx.font = `${Math.round(16 * s)}px "Segoe UI", Arial, sans-serif`;
+        ctx.fillText(severity, this.cx, this.cy - 20 * s);
     }
 
     static getSeverityLabel(score) {

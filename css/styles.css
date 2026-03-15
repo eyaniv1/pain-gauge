@@ -267,14 +267,22 @@ body {
 
 @media (max-width: 420px) {
     .pain-btn {
-        width: 30px;
-        height: 30px;
-        font-size: 12px;
+        width: 32px;
+        height: 38px;
+        font-size: 13px;
         border-radius: 6px;
     }
 
     .pain-buttons {
         gap: 3px;
+    }
+
+    .calib-controls h1 {
+        font-size: 20px;
+    }
+
+    .calib-instructions {
+        font-size: 13px;
     }
 }
 
@@ -478,6 +486,7 @@ main {
 
 .gauge-panel {
     width: 400px;
+    max-width: 100%;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
@@ -1087,6 +1096,62 @@ footer {
 
     .settings-panel {
         padding: 10px 16px;
+    }
+
+    /* History table: hide less-important columns on mobile */
+    .col-hide-mobile {
+        display: none;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 8px 6px;
+    }
+
+    /* Larger touch targets for buttons */
+    .btn-small {
+        min-height: 36px;
+        min-width: 36px;
+    }
+
+    .btn-source,
+    #settings-btn {
+        min-height: 40px;
+        min-width: 40px;
+    }
+
+    /* Flip camera button */
+    #flip-camera-btn {
+        min-height: 40px;
+        min-width: 40px;
+    }
+}
+
+@media (max-width: 480px) {
+    header {
+        padding: 6px 8px;
+    }
+
+    header h1 {
+        font-size: 14px;
+    }
+
+    main {
+        padding: 6px;
+        gap: 6px;
+    }
+
+    footer {
+        padding: 8px 10px;
+    }
+
+    .au-breakdown {
+        padding: 10px 12px;
+    }
+
+    .au-bar label {
+        font-size: 11px;
+        width: 40px;
     }
 }
 

@@ -651,13 +651,24 @@
 
     // ── Start camera ──────────────────────────────────────────────
 
+    let useFrontCamera = true;
+    const flipCameraBtn = document.getElementById('flip-camera-btn');
+
     async function startCamera() {
         stopVideoLoop();
+
+        // Stop existing camera if any
+        if (cameraInstance) {
+            try { cameraInstance.stop(); } catch (e) { /* ignore */ }
+            cameraInstance = null;
+        }
+
         try {
             cameraInstance = new Camera(videoEl, {
                 onFrame: async () => {
                     await faceMesh.send({ image: videoEl });
                 },
+                facingMode: useFrontCamera ? 'user' : 'environment',
                 width: 640,
                 height: 480,
             });
@@ -666,10 +677,16 @@
             inputMode = 'camera';
             cameraBtn.classList.add('active');
             loadVideoBtn.classList.remove('active');
-            videoEl.style.transform = '';
-            overlayEl.style.transform = '';
+            // Mirror front camera, don't mirror rear
+            videoEl.style.transform = useFrontCamera ? '' : 'scaleX(1)';
+            overlayEl.style.transform = useFrontCamera ? '' : 'scaleX(1)';
         } catch (err) {
             console.error('Camera start failed:', err);
+            // If rear camera failed, fall back to front
+            if (!useFrontCamera) {
+                useFrontCamera = true;
+                startCamera();
+            }
         }
     }
 
@@ -678,6 +695,13 @@
     cameraBtn.addEventListener('click', () => {
         if (inputMode === 'camera') return;
         startCamera();
+    });
+
+    flipCameraBtn.addEventListener('click', () => {
+        useFrontCamera = !useFrontCamera;
+        if (inputMode === 'camera') {
+            startCamera();
+        }
     });
 
     loadVideoBtn.addEventListener('click', () => {
@@ -917,14 +941,14 @@
             tr.innerHTML = `
                 <td>${timeStr}</td>
                 <td>${s.score != null ? s.score.toFixed(1) : '-'}</td>
-                <td>${s.pspi != null ? s.pspi.toFixed(2) : '-'}</td>
+                <td class="col-hide-mobile">${s.pspi != null ? s.pspi.toFixed(2) : '-'}</td>
                 <td>${aiScoreHtml}</td>
-                <td class="correction-cell">${correctionHtml}</td>
-                <td>${face.au4 != null ? face.au4.toFixed(1) : '-'}</td>
-                <td>${face.au6_7 != null ? face.au6_7.toFixed(1) : '-'}</td>
-                <td>${face.au9_10 != null ? face.au9_10.toFixed(1) : '-'}</td>
-                <td>${face.au43 != null ? face.au43.toFixed(1) : '-'}</td>
-                <td>${s.frame_filename ? '<span class="frame-link" data-frame="' + s.frame_filename + '" data-time="' + timeStr + '">View</span>' : '-'}</td>
+                <td class="correction-cell col-hide-mobile">${correctionHtml}</td>
+                <td class="col-hide-mobile">${face.au4 != null ? face.au4.toFixed(1) : '-'}</td>
+                <td class="col-hide-mobile">${face.au6_7 != null ? face.au6_7.toFixed(1) : '-'}</td>
+                <td class="col-hide-mobile">${face.au9_10 != null ? face.au9_10.toFixed(1) : '-'}</td>
+                <td class="col-hide-mobile">${face.au43 != null ? face.au43.toFixed(1) : '-'}</td>
+                <td class="col-hide-mobile">${s.frame_filename ? '<span class="frame-link" data-frame="' + s.frame_filename + '" data-time="' + timeStr + '">View</span>' : '-'}</td>
             `;
 
             // Frame click handler
