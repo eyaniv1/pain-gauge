@@ -645,6 +645,121 @@ footer {
     border-color: #bbb;
 }
 
+/* ── Patient Selector ───────────────────────────────────── */
+
+.patient-selector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#patient-select {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    background: #fff;
+    color: #333;
+    max-width: 180px;
+}
+
+#add-patient-btn {
+    padding: 4px 8px;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+/* ── Backend URL Setting ────────────────────────────────── */
+
+.setting-item-wide {
+    grid-column: 1 / -1;
+}
+
+.setting-item input[type="text"] {
+    flex: 1;
+    min-width: 160px;
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.connection-status {
+    font-size: 16px;
+    line-height: 1;
+    color: #ccc;
+}
+
+.connection-status.connected {
+    color: #27ae60;
+}
+
+.connection-status.disconnected {
+    color: #c0392b;
+}
+
+/* ── Modal ──────────────────────────────────────────────── */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+    color: #333;
+}
+
+.modal-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.modal-form label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.modal-form input,
+.modal-form textarea {
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 16px;
+}
+
 /* ── Source Buttons ──────────────────────────────────────── */
 
 .btn-source,

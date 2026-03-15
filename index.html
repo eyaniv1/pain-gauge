@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pain Gauge - Real-Time Pain Monitor</title>
-    <link rel="stylesheet" href="css/styles.css?v=2">
+    <link rel="stylesheet" href="css/styles.css?v=3">
 </head>
 <body>
 
@@ -78,6 +78,12 @@
     <div class="screen active" id="screen-main">
         <header>
             <h1>Pain Gauge</h1>
+            <div class="patient-selector">
+                <select id="patient-select">
+                    <option value="">-- No Patient --</option>
+                </select>
+                <button type="button" class="btn btn-small" id="add-patient-btn" title="New Patient">+</button>
+            </div>
             <div class="header-spacer"></div>
             <button type="button" class="btn btn-start btn-small" id="start-btn">Start Session</button>
             <button type="button" class="btn btn-end btn-small hidden" id="end-btn">End Session</button>
@@ -129,6 +135,11 @@
                     <label for="set-sample-int">Sample Interval (ms)</label>
                     <input type="range" id="set-sample-int" min="100" max="2000" step="50" value="500">
                     <span class="setting-value" id="val-sample-int">500</span>
+                </div>
+                <div class="setting-item setting-item-wide">
+                    <label for="set-backend-url">Backend URL</label>
+                    <input type="text" id="set-backend-url" placeholder="http://localhost:3000" value="">
+                    <span class="connection-status" id="connection-status" title="Not connected">&#x25cf;</span>
                 </div>
             </div>
             <button type="button" class="btn btn-small" id="reset-settings-btn">Reset to Defaults</button>
@@ -193,6 +204,23 @@
         </footer>
     </div>
 
+    <!-- New Patient Modal -->
+    <div class="modal-overlay hidden" id="patient-modal">
+        <div class="modal">
+            <h2 id="patient-modal-title">New Patient</h2>
+            <div class="modal-form">
+                <label>Name <input type="text" id="patient-name" required></label>
+                <label>Date of Birth <input type="date" id="patient-dob"></label>
+                <label>Patient ID <input type="text" id="patient-ext-id" placeholder="Optional"></label>
+                <label>Notes <textarea id="patient-notes" rows="2"></textarea></label>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-small" id="patient-cancel-btn">Cancel</button>
+                <button type="button" class="btn btn-small btn-primary" id="patient-save-btn">Save</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Tab switching (standalone) -->
     <script>
         function switchView(index) {
@@ -211,9 +239,10 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
 
     <!-- Application -->
-    <script src="js/pain-engine.js?v=2"></script>
-    <script src="js/gauge.js?v=2"></script>
-    <script src="js/session-chart.js?v=2"></script>
-    <script src="js/main.js?v=2"></script>
+    <script src="js/pain-engine.js?v=3"></script>
+    <script src="js/gauge.js?v=3"></script>
+    <script src="js/session-chart.js?v=3"></script>
+    <script src="js/api-client.js?v=3"></script>
+    <script src="js/main.js?v=3"></script>
 </body>
 </html>

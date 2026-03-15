@@ -6,6 +6,7 @@
  * - Main: gauge + camera/history toggle, session start/end controls
  * - Calibration: accessed via Calibrate button, captures face baseline
  * - Settings: tunable sensitivity parameters, persisted to localStorage
+ * - Backend: patient management, session persistence, frame capture
  */
 
 (function () {
@@ -23,6 +24,7 @@
         talkingSuppression: 0.5,
         smoothingSize: 8,
         sampleIntervalMs: 500,
+        backendUrl: '',
     };
 
     function loadSettings() {
@@ -45,9 +47,15 @@
     let SAMPLE_INTERVAL_MS = settings.sampleIntervalMs;
     let inputMode = 'camera'; // 'camera' or 'video'
     let autoCalibFrames = 0;
-    const AUTO_CALIB_COUNT = 30; // silent auto-calibrate from first ~1s of frames
+    const AUTO_CALIB_COUNT = 30;
     let cameraInstance = null;
     let videoLoopId = null;
+
+    // Backend state
+    let currentPatientId = localStorage.getItem('painGaugePatientId') || '';
+    let currentSessionId = null;
+    let sampleBuffer = []; // accumulated samples to send in batches
+    let sampleFlushInterval = null;
 
     // ── Screens ───────────────────────────────────────────────────
 
@@ -95,6 +103,8 @@
     const settingsBtn = document.getElementById('settings-btn');
     const settingsPanel = document.getElementById('settings-panel');
     const resetSettingsBtn = document.getElementById('reset-settings-btn');
+    const backendUrlInput = document.getElementById('set-backend-url');
+    const connectionStatusEl = document.getElementById('connection-status');
 
     const settingInputs = {
         au4Sensitivity:     { input: 'set-au4-sens',    display: 'val-au4-sens' },
@@ -112,6 +122,19 @@
     const cameraBtn = document.getElementById('camera-btn');
     const loadVideoBtn = document.getElementById('load-video-btn');
     const videoFileInput = document.getElementById('video-file-input');
+
+    // ── DOM refs: Patient ────────────────────────────────────────
+
+    const patientSelect = document.getElementById('patient-select');
+    const addPatientBtn = document.getElementById('add-patient-btn');
+    const patientModal = document.getElementById('patient-modal');
+    const patientModalTitle = document.getElementById('patient-modal-title');
+    const patientNameInput = document.getElementById('patient-name');
+    const patientDobInput = document.getElementById('patient-dob');
+    const patientExtIdInput = document.getElementById('patient-ext-id');
+    const patientNotesInput = document.getElementById('patient-notes');
+    const patientSaveBtn = document.getElementById('patient-save-btn');
+    const patientCancelBtn = document.getElementById('patient-cancel-btn');
 
     // ── Initialize engine, gauge & chart ──────────────────────────
 
@@ -131,6 +154,7 @@
             document.getElementById(input).value = s[key];
             document.getElementById(display).textContent = s[key];
         }
+        backendUrlInput.value = s.backendUrl || '';
     }
 
     function bindSettingInputs() {
@@ -142,7 +166,6 @@
                 valEl.textContent = val;
                 settings[key] = val;
 
-                // Apply to engine
                 if (key === 'smoothingSize') {
                     engine.smoothingSize = val;
                 } else if (key === 'sampleIntervalMs') {
@@ -159,18 +182,118 @@
     applySettingsToUI(settings);
     bindSettingInputs();
 
+    // Backend URL input
+    let backendUrlDebounce = null;
+    backendUrlInput.addEventListener('input', () => {
+        clearTimeout(backendUrlDebounce);
+        backendUrlDebounce = setTimeout(() => {
+            settings.backendUrl = backendUrlInput.value.trim();
+            saveSettings(settings);
+            initBackend();
+        }, 800);
+    });
+
     resetSettingsBtn.addEventListener('click', () => {
-        settings = { ...DEFAULTS };
+        const keepBackendUrl = settings.backendUrl;
+        settings = { ...DEFAULTS, backendUrl: keepBackendUrl };
         applySettingsToUI(settings);
-        // Apply all to engine
         for (const key of Object.keys(DEFAULTS)) {
             if (key === 'sampleIntervalMs') {
                 SAMPLE_INTERVAL_MS = DEFAULTS[key];
+            } else if (key === 'backendUrl') {
+                // keep current backend URL
             } else {
                 engine[key] = DEFAULTS[key];
             }
         }
         saveSettings(settings);
+    });
+
+    // ── Backend initialization ───────────────────────────────────
+
+    function updateConnectionStatus() {
+        if (PainGaugeAPI.isConnected()) {
+            connectionStatusEl.className = 'connection-status connected';
+            connectionStatusEl.title = 'Connected';
+        } else {
+            connectionStatusEl.className = 'connection-status disconnected';
+            connectionStatusEl.title = 'Not connected';
+        }
+    }
+
+    async function initBackend() {
+        const url = settings.backendUrl;
+        PainGaugeAPI.setBaseUrl(url);
+        if (!url) {
+            updateConnectionStatus();
+            return;
+        }
+        await PainGaugeAPI.checkConnection();
+        updateConnectionStatus();
+        if (PainGaugeAPI.isConnected()) {
+            await loadPatients();
+        }
+    }
+
+    // ── Patient management ──────────────────────────────────────
+
+    async function loadPatients() {
+        const patients = await PainGaugeAPI.listPatients();
+        patientSelect.innerHTML = '<option value="">-- No Patient --</option>';
+        for (const p of patients) {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name + (p.patient_id ? ` (${p.patient_id})` : '');
+            patientSelect.appendChild(opt);
+        }
+        // Restore last selected patient
+        if (currentPatientId) {
+            patientSelect.value = currentPatientId;
+        }
+    }
+
+    patientSelect.addEventListener('change', () => {
+        currentPatientId = patientSelect.value;
+        localStorage.setItem('painGaugePatientId', currentPatientId);
+    });
+
+    addPatientBtn.addEventListener('click', () => {
+        if (!PainGaugeAPI.isConnected()) {
+            alert('Backend not connected. Set the Backend URL in Settings first.');
+            return;
+        }
+        patientModalTitle.textContent = 'New Patient';
+        patientNameInput.value = '';
+        patientDobInput.value = '';
+        patientExtIdInput.value = '';
+        patientNotesInput.value = '';
+        patientModal.classList.remove('hidden');
+        patientNameInput.focus();
+    });
+
+    patientCancelBtn.addEventListener('click', () => {
+        patientModal.classList.add('hidden');
+    });
+
+    patientSaveBtn.addEventListener('click', async () => {
+        const name = patientNameInput.value.trim();
+        if (!name) {
+            patientNameInput.focus();
+            return;
+        }
+        const patient = await PainGaugeAPI.createPatient({
+            name,
+            dob: patientDobInput.value || null,
+            patient_id: patientExtIdInput.value.trim() || null,
+            notes: patientNotesInput.value.trim() || null,
+        });
+        if (patient) {
+            await loadPatients();
+            patientSelect.value = patient.id;
+            currentPatientId = patient.id;
+            localStorage.setItem('painGaugePatientId', currentPatientId);
+        }
+        patientModal.classList.add('hidden');
     });
 
     // ── FPS tracking ──────────────────────────────────────────────
@@ -213,21 +336,19 @@
 
     let calibrationFrames = 0;
     let isCalibrating = false;
-    const CALIBRATION_FRAME_COUNT = 45; // ~1.5 seconds
+    const CALIBRATION_FRAME_COUNT = 45;
 
     calibrateBtn.addEventListener('click', () => {
         isCalibrating = true;
         calibrationFrames = 0;
         engine.resetCalibration();
-        autoCalibFrames = AUTO_CALIB_COUNT; // skip auto-calib after manual
-        // Set the baseline pain level from hidden input
+        autoCalibFrames = AUTO_CALIB_COUNT;
         engine.baselinePainLevel = parseInt(baselinePainInput.value);
         calibrateBtn.disabled = true;
         calibrateBtn.textContent = 'Hold still...';
         calibInstructions.innerHTML = 'Capturing face at <strong>current pain level</strong>...';
         calibProgress.classList.remove('hidden');
         calibProgressBar.style.width = '0%';
-        // Start video playback if in video mode
         if (inputMode === 'video') {
             videoEl.currentTime = 0;
             videoEl.play();
@@ -240,12 +361,9 @@
         const level = engine.baselinePainLevel;
         calibInstructions.innerHTML = `Calibrated at pain level <strong>${level}</strong>. Returning...`;
         calibProgress.classList.add('hidden');
-        // Pause video after calibration capture
         if (inputMode === 'video') {
             videoEl.pause();
         }
-
-        // Move video back to main screen after short delay
         setTimeout(() => {
             moveVideoToMain();
             showScreen(screenMain);
@@ -257,7 +375,6 @@
     function moveVideoToMain() {
         mainVideoContainer.appendChild(videoEl);
         mainVideoContainer.appendChild(overlayEl);
-        // Ensure no-face warning exists in main
         if (!document.getElementById('no-face-warning-main')) {
             const warning = document.createElement('div');
             warning.id = 'no-face-warning-main';
@@ -276,18 +393,14 @@
     // ── Calibrate (go to calibration screen) ─────────────────────
 
     recalibrateBtn.addEventListener('click', () => {
-        // Stop any active session
         if (sessionActive) {
             endSession();
         }
-        // Pause video so it waits for Calibrate press
         if (inputMode === 'video') {
             videoEl.pause();
             videoEl.currentTime = 0;
         }
-        // Move video to calibration screen
         moveVideoToCalib();
-        // Reset calibration UI
         calibrateBtn.disabled = false;
         calibrateBtn.textContent = 'Calibrate';
         calibInstructions.innerHTML = 'What is the patient\'s <strong>current pain level</strong>?';
@@ -296,6 +409,20 @@
         engine.resetCalibration();
         showScreen(screenCalib);
     });
+
+    // ── Frame capture ────────────────────────────────────────────
+
+    const frameCanvas = document.createElement('canvas');
+    const frameCtx = frameCanvas.getContext('2d');
+
+    function captureFrame() {
+        const w = 160;
+        const h = 120;
+        frameCanvas.width = w;
+        frameCanvas.height = h;
+        frameCtx.drawImage(videoEl, 0, 0, w, h);
+        return frameCanvas.toDataURL('image/jpeg', 0.6);
+    }
 
     // ── Session Start / End ───────────────────────────────────────
 
@@ -307,12 +434,12 @@
         endSession();
     });
 
-    function startSession() {
-        // Clear previous session data
+    async function startSession() {
         chart.resetRecording();
         chart.startRecording();
         engine.smoothingWindow = [];
-        // Restart video from beginning
+        sampleBuffer = [];
+
         if (inputMode === 'video') {
             videoEl.currentTime = 0;
             videoEl.play();
@@ -324,16 +451,29 @@
         sessionStatusEl.textContent = 'Recording';
         sessionStatusEl.style.color = '#c0392b';
         startTimer();
-
-        // Switch to camera view
         switchView(0);
+
+        // Create session on backend
+        currentSessionId = null;
+        if (PainGaugeAPI.isConnected() && currentPatientId) {
+            const session = await PainGaugeAPI.createSession(currentPatientId, {
+                baseline_pain_level: engine.baselinePainLevel,
+                calibration_data: engine.baseline,
+                settings_snapshot: settings,
+            });
+            if (session) {
+                currentSessionId = session.id;
+            }
+        }
+
+        // Flush samples to backend every 5 seconds
+        sampleFlushInterval = setInterval(flushSamples, 5000);
     }
 
-    function endSession() {
+    async function endSession() {
         sessionActive = false;
         chart.stopRecording();
         stopTimer();
-        // Pause video on session end
         if (inputMode === 'video') {
             videoEl.pause();
         }
@@ -344,20 +484,50 @@
         sessionStatusEl.textContent = 'Session ended';
         sessionStatusEl.style.color = '#888';
 
-        // Switch to history view to show results
+        // Flush remaining samples and end session on backend
+        clearInterval(sampleFlushInterval);
+        await flushSamples();
+        if (currentSessionId) {
+            await PainGaugeAPI.endSession(currentSessionId, {});
+            currentSessionId = null;
+        }
+
         switchView(1);
+    }
+
+    async function flushSamples() {
+        if (!currentSessionId || sampleBuffer.length === 0) return;
+        const batch = sampleBuffer.splice(0);
+        await PainGaugeAPI.sendSamples(currentSessionId, batch);
     }
 
     // ── Session chart sampling ────────────────────────────────────
 
     let lastSampleTime = 0;
+    let lastResult = null;
 
-    function maybeRecordSample(score) {
+    function maybeRecordSample(result) {
         if (!sessionActive) return;
         const now = performance.now();
         if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
-            chart.addSample(score);
+            chart.addSample(result.score);
             lastSampleTime = now;
+
+            // Buffer sample for backend
+            if (currentSessionId) {
+                const elapsed = chart.getElapsedTime() * 1000;
+                const sample = {
+                    timestamp_ms: Math.round(elapsed),
+                    score: result.score,
+                    raw_score: result.rawScore,
+                    pspi: result.pspi,
+                    sensor_data: {
+                        face: result.aus,
+                    },
+                    frame: captureFrame(),
+                };
+                sampleBuffer.push(sample);
+            }
         }
     }
 
@@ -383,14 +553,12 @@
     function onResults(results) {
         updateFps();
 
-        // Resize overlay to match video
         overlayEl.width = results.image.width;
         overlayEl.height = results.image.height;
         overlayCtx.clearRect(0, 0, overlayEl.width, overlayEl.height);
 
         const hasFace = results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0;
 
-        // Update face warning
         noFaceWarning.classList.toggle('hidden', hasFace);
         const mainWarning = document.getElementById('no-face-warning-main');
         if (mainWarning) mainWarning.classList.toggle('hidden', hasFace);
@@ -398,35 +566,30 @@
         if (!hasFace) return;
 
         const landmarks = results.multiFaceLandmarks[0];
-
-        // Draw face mesh on overlay
         drawFaceMesh(landmarks);
 
-        // Calibration mode
         if (isCalibrating) {
             engine.calibrate(landmarks);
             calibrationFrames++;
             const pct = Math.round((calibrationFrames / CALIBRATION_FRAME_COUNT) * 100);
             calibProgressBar.style.width = pct + '%';
-
             if (calibrationFrames >= CALIBRATION_FRAME_COUNT) {
                 onCalibrationComplete();
             }
             return;
         }
 
-        // Auto-calibrate from first frames if no manual calibration yet
         if (!engine.isCalibrated() && autoCalibFrames < AUTO_CALIB_COUNT) {
             engine.calibrate(landmarks);
             autoCalibFrames++;
             return;
         }
 
-        // Score pain (always process for live gauge, but only record in session)
         const result = engine.process(landmarks);
         gauge.setScore(result.score);
         updateAUBars(result.aus);
-        maybeRecordSample(result.score);
+        lastResult = result;
+        maybeRecordSample(result);
     }
 
     // ── Draw face mesh overlay ────────────────────────────────────
@@ -504,12 +667,10 @@
         const file = e.target.files[0];
         if (!file) return;
         loadVideoFile(file);
-        // Reset so the same file can be re-selected
         videoFileInput.value = '';
     });
 
     function loadVideoFile(file) {
-        // Stop camera if running
         if (cameraInstance) {
             cameraInstance.stop();
             cameraInstance = null;
@@ -521,7 +682,6 @@
         videoEl.src = url;
         videoEl.muted = true;
         videoEl.loop = true;
-        // Don't mirror file videos (they're not selfie-cam)
         videoEl.style.transform = 'none';
         overlayEl.style.transform = 'none';
 
@@ -530,7 +690,6 @@
             inputMode = 'video';
             loadVideoBtn.classList.add('active');
             cameraBtn.classList.remove('active');
-            // Don't autoplay — wait for Start Session or Calibrate
             videoEl.pause();
             videoEl.currentTime = 0;
             startVideoLoop();
@@ -555,5 +714,8 @@
         }
     }
 
+    // ── Initialize ───────────────────────────────────────────────
+
+    initBackend();
     startCamera();
 })();
