@@ -140,8 +140,16 @@ async def predict(req: PredictRequest):
     if result is None:
         raise HTTPException(status_code=400, detail="Invalid image data")
 
+    # Adapt channels if model expects grayscale (1 channel) but preprocessing outputs RGB (3 channels)
+    image_array = result.image_array
+    if input_shape and len(input_shape) == 4 and input_shape[1] == 1 and image_array.shape[1] == 3:
+        # Convert RGB to grayscale: standard luminance weights
+        image_array = 0.2989 * image_array[:, 0:1, :, :] + \
+                      0.5870 * image_array[:, 1:2, :, :] + \
+                      0.1140 * image_array[:, 2:3, :, :]
+
     # Run inference
-    prediction = manager.predict(result.image_array)
+    prediction = manager.predict(image_array)
 
     # Blend with AU data if provided
     blended = blend_scores(prediction["score"], req.au_data)

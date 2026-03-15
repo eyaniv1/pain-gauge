@@ -1,8 +1,8 @@
 {
-    "version": "0.0.0",
+    "version": "ferplus-v8",
     "format": "onnx",
-    "description": "Placeholder — replace with a real pain detection model",
-    "trained_on": "none",
-    "accuracy": null,
-    "notes": "Place a .onnx or .pt model file in this directory to enable AI inference"
+    "description": "FERPlus emotion recognition model (8 classes) with pain mapping. Emotions mapped: neutral=0, happy=0, surprise=1, sad=4, anger=6, disgust=7, fear=8, contempt=3",
+    "trained_on": "FER+ dataset (facial emotion recognition)",
+    "input": "1x1x64x64 grayscale",
+    "notes": "Baseline model — not pain-specific. Negative emotions are mapped to higher pain scores as a heuristic. Replace with a pain-trained model for better accuracy."
 }
