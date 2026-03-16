@@ -979,6 +979,27 @@ footer {
     text-decoration: underline;
 }
 
+.frame-thumb {
+    width: 52px;
+    height: 38px;
+    object-fit: cover;
+    border-radius: 3px;
+    cursor: pointer;
+    display: block;
+    border: 1px solid #ddd;
+    transition: opacity 0.15s, border-color 0.15s;
+}
+
+.frame-thumb:hover {
+    opacity: 0.85;
+    border-color: #2980b9;
+}
+
+.frame-cell {
+    padding: 4px 6px !important;
+    vertical-align: middle;
+}
+
 .history-empty {
     text-align: center;
     padding: 40px 20px;

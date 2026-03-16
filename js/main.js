@@ -949,25 +949,29 @@
 
             if (s.corrected_score != null) tr.classList.add('sample-corrected');
 
+            const frameThumb = s.frame_filename
+                ? `<img class="frame-thumb" src="${PainGaugeAPI.frameUrl(s.frame_filename)}" data-frame="${s.frame_filename}" data-time="${timeStr}" alt="Frame at ${timeStr}" loading="lazy">`
+                : '-';
+
             tr.innerHTML = `
                 <td>${timeStr}</td>
                 <td>${s.score != null ? s.score.toFixed(1) : '-'}</td>
                 <td class="col-hide-mobile">${s.pspi != null ? s.pspi.toFixed(2) : '-'}</td>
-                <td>${aiScoreHtml}</td>
-                <td class="correction-cell col-hide-mobile">${correctionHtml}</td>
+                <td class="col-hide-mobile">${aiScoreHtml}</td>
+                <td class="correction-cell">${correctionHtml}</td>
                 <td class="col-hide-mobile">${face.au4 != null ? face.au4.toFixed(1) : '-'}</td>
                 <td class="col-hide-mobile">${face.au6_7 != null ? face.au6_7.toFixed(1) : '-'}</td>
                 <td class="col-hide-mobile">${face.au9_10 != null ? face.au9_10.toFixed(1) : '-'}</td>
                 <td class="col-hide-mobile">${face.au43 != null ? face.au43.toFixed(1) : '-'}</td>
-                <td class="col-hide-mobile">${s.frame_filename ? '<span class="frame-link" data-frame="' + s.frame_filename + '" data-time="' + timeStr + '">View</span>' : '-'}</td>
+                <td class="frame-cell">${frameThumb}</td>
             `;
 
             // Frame click handler
-            const frameLink = tr.querySelector('.frame-link');
-            if (frameLink) {
-                frameLink.addEventListener('click', () => {
-                    frameModalImg.src = PainGaugeAPI.frameUrl(frameLink.dataset.frame);
-                    frameModalTitle.textContent = `Frame at ${frameLink.dataset.time}`;
+            const frameThumbEl = tr.querySelector('.frame-thumb');
+            if (frameThumbEl) {
+                frameThumbEl.addEventListener('click', () => {
+                    frameModalImg.src = PainGaugeAPI.frameUrl(frameThumbEl.dataset.frame);
+                    frameModalTitle.textContent = `Frame at ${frameThumbEl.dataset.time}`;
                     frameModal.classList.remove('hidden');
                 });
             }
