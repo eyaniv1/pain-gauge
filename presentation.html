@@ -923,6 +923,111 @@ html, body {
   text-align: center;
   margin-top: 8px;
 }
+
+/* ── Mobile responsive ───────────────────────────────────── */
+@media (max-width: 680px) {
+
+  /* Slides: scrollable, compact padding */
+  .slide {
+    padding: 48px 18px 72px;
+    justify-content: flex-start;
+    overflow-y: auto;
+    align-items: flex-start;
+  }
+
+  /* Fixed chrome */
+  #brand-corner { bottom: 8px; right: 10px; gap: 4px; opacity: 0.6; }
+  #brand-corner .bc-name { font-size: 10px; }
+  #brand-corner svg { width: 20px; height: 20px; }
+  .nav-hint { display: none; }
+  .slide-counter { font-size: 11px; bottom: 12px; }
+
+  /* Typography scale-down */
+  .headline { font-size: clamp(28px, 7vw, 44px); }
+  .display  { font-size: clamp(36px, 9vw, 56px); }
+  .subhead  { font-size: clamp(15px, 4vw, 20px); }
+  .label    { font-size: 11px; }
+
+  /* ── Slide 1 — Title ─── */
+  #s1 .brand-mark { display: none; }
+  #s1 .title-block { text-align: left; }
+  #s1 .main-title { font-size: clamp(48px, 14vw, 80px); }
+  #s1 .subtitle { max-width: 100%; font-size: clamp(16px, 4.5vw, 22px); }
+  #s1 .tagline { flex-wrap: wrap; gap: 6px; }
+  #s1 .tag-item { margin-right: 0; font-size: 12px; padding: 6px 12px; }
+  #s1 .eyebrow { font-size: 11px; }
+
+  /* ── Slide 2 — Problem cards ─── */
+  #s2 .content { gap: 24px; }
+  .cards { grid-template-columns: 1fr; gap: 10px; }
+  .problem-card { padding: 18px 16px; }
+  .problem-card .card-sub { font-size: 14px; }
+
+  /* ── Slide 3 — Flow ─── */
+  #s3 .flow { flex-direction: column; align-items: stretch; gap: 4px; }
+  .flow-node { flex: none; }
+  .flow-split { flex: none; flex-direction: column; }
+  .flow-arrow { transform: rotate(90deg); align-self: center; margin: 4px 0; }
+
+  /* ── Slide 4 — Action Units ─── */
+  .au-layout { grid-template-columns: 1fr !important; gap: 20px !important; }
+  #s4 .au-layout > *:first-child { display: none; } /* hide face SVG */
+  .au-item { gap: 10px; }
+
+  /* ── Slide 5 — CNN ─── */
+  .cnn-layout { flex-direction: column !important; align-items: stretch; gap: 10px; }
+  .cnn-box  { flex: none !important; width: 100%; }
+  .score-out { flex: none !important; width: 100%; }
+  .cnn-arrow { align-self: center; transform: rotate(90deg); }
+  .face-card { flex: none; }
+
+  /* ── Slide 6 — Calibration ─── */
+  .timeline { flex-direction: column; gap: 0; }
+  .tl-step { flex: none; flex-direction: row; gap: 14px; align-items: flex-start; padding-bottom: 20px; }
+  .tl-step:not(:last-child)::after { display: none; }
+  .tl-dot { flex-shrink: 0; }
+  .tl-content { flex: 1; }
+  /* bottom flex row (inline style) */
+  #s6 div[style*="display:flex"][style*="gap:20px"] {
+    flex-direction: column !important;
+    gap: 10px !important;
+    margin-top: 20px !important;
+  }
+
+  /* ── Slide 7 — Blend ─── */
+  .blend-eq { gap: 8px 10px; justify-content: center; }
+  .blend-term { min-width: 100px; }
+  .blend-desc { grid-template-columns: 1fr; gap: 10px; }
+  .blend-why { font-size: 15px; }
+
+  /* ── Slide 8 — Beyond the Face ─── */
+  #s8 div[style*="grid-template-columns"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 20px !important;
+  }
+  #s8 div[style*="grid-template-columns"] > div:last-child { display: none; } /* hide person SVG */
+  #s8 div[style*="flex-direction:column"] > div { font-size: 15px !important; }
+  #s8 div[style*="flex-direction:column"] > div > div:first-child { font-size: 16px !important; }
+  #s8 div[style*="display:flex"][style*="align-items:center"] { padding: 14px !important; gap: 12px !important; }
+
+  /* ── Slide 9 — Clinical Output ─── */
+  #s9_output .output-layout { grid-template-columns: 1fr !important; gap: 16px; }
+
+  /* ── Slide 10 — Workflow ─── */
+  #s9 .workflow { flex-direction: column; align-items: flex-start; gap: 0; }
+  .wf-step { flex: none; width: 100%; flex-direction: row !important; align-items: center; gap: 14px; padding-bottom: 16px; }
+  .wf-step:not(:last-child)::after { display: none; }
+  .wf-num { flex-shrink: 0; width: 44px; height: 44px; }
+  .wf-label { font-size: 15px; text-align: left; }
+  .wf-sub { text-align: left; max-width: none; font-size: 13px; }
+
+  /* ── Slide 11 — Summary ─── */
+  .stats { grid-template-columns: 1fr; gap: 10px; }
+  .stat-block { padding: 18px 16px; }
+  .stat-big { font-size: clamp(36px, 10vw, 52px); }
+  .closing { font-size: clamp(16px, 4.5vw, 22px); }
+}
 </style>
 </head>
 <body>
