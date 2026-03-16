@@ -331,13 +331,14 @@ header {
 
 .app-brand {
     display: flex;
+    flex-direction: row;
     align-items: center;
-    gap: 7px;
+    gap: 10px;
     flex-shrink: 0;
 }
 
 .app-brand .brand-name {
-    font-size: 18px;
+    font-size: 22px;
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     letter-spacing: -0.02em;
     line-height: 1;
