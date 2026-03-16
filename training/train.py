@@ -5,9 +5,23 @@ Fine-tunes a pre-trained model on labeled pain data (UNBC-McMaster format
 or clinician corrections). Supports configurable hyperparameters, saves
 best checkpoint, and exports ONNX version.
 
+Two model modes:
+
+  SimplePainModel (default):
+    Single-frame RGB CNN. Fast to train. Does not use calibration reference.
+
+  ComparativePainModel (--comparative):
+    Shared-encoder CNN that subtracts reference-frame features from target-frame
+    features. Requires a reference_filename column in labels.csv (produced by
+    prepare_dataset_pemf.py). Matches the architecture of the deployed
+    pain-unbc-v2.onnx model, so calibration at inference time is preserved.
+    Optionally initialised from a TaatiTeam checkpoint (--init-weights).
+
 Usage:
   python train.py --data-dir training/data/unbc --base-model models/active/model.onnx
   python train.py --data-dir training/data/unbc --epochs 20 --lr 0.0001
+  python train.py --data-dir training/data/pemf --comparative
+  python train.py --data-dir training/data/pemf --comparative --init-weights checkpoints/model_epoch13.pt
 """
 
 import argparse
@@ -31,6 +45,188 @@ try:
     TORCH_AVAILABLE = True
 except ImportError:
     TORCH_AVAILABLE = False
+
+
+def grayscale_clahe(img_bgr: np.ndarray, target_size: tuple[int, int]) -> np.ndarray:
+    """
+    Convert a BGR image to a normalised grayscale array ready for the
+    comparative model.  Matches the normalize_grayscale() pipeline in
+    inference/preprocessing.py so there is no train/inference mismatch.
+
+    Returns float32 array of shape (1, H, W) with values in [0, 1].
+    """
+    img = cv2.resize(img_bgr, target_size, interpolation=cv2.INTER_LINEAR)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    gray = clahe.apply(gray)
+    arr = gray.astype(np.float32) / 255.0
+    return arr[np.newaxis, ...]  # (1, H, W)
+
+
+class ComparativePainDataset:
+    """
+    Dataset for the comparative model.
+
+    Loads a target face frame and its paired reference (neutral) frame,
+    stacks them as a (2, H, W) grayscale tensor, and returns the pain score.
+
+    Expects labels.csv to have a reference_filename column (produced by
+    prepare_dataset_pemf.py).  Samples missing a reference are skipped.
+    """
+
+    # Default input size to match the deployed comparative model
+    DEFAULT_SIZE = (160, 160)
+
+    def __init__(self, split_dir: str, target_size: tuple[int, int] | None = None):
+        self.split_dir = Path(split_dir)
+        self.target_size = target_size or self.DEFAULT_SIZE
+        self.samples = []
+        self._load_labels()
+
+    def _load_labels(self):
+        csv_path = self.split_dir / "labels.csv"
+        if not csv_path.exists():
+            return
+
+        with open(csv_path) as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if not row.get("pain_score"):
+                    continue
+                ref = row.get("reference_filename", "").strip()
+                if not ref:
+                    continue  # comparative model requires a reference frame
+                self.samples.append({
+                    "filename": row["filename"],
+                    "reference_filename": ref,
+                    "pain_score": float(row["pain_score"]),
+                })
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        sample = self.samples[idx]
+        images_dir = self.split_dir / "images"
+
+        target = self._load_frame(images_dir / sample["filename"])
+        reference = self._load_frame(images_dir / sample["reference_filename"])
+
+        # Stack → (2, H, W): channel 0 = target, channel 1 = reference
+        pair = np.concatenate([target, reference], axis=0)
+
+        pain_score = sample["pain_score"] / 10.0  # Normalise to 0-1 for training
+
+        if TORCH_AVAILABLE:
+            return (
+                torch.tensor(pair, dtype=torch.float32),
+                torch.tensor(pain_score, dtype=torch.float32),
+            )
+        return pair, pain_score
+
+    def _load_frame(self, path: Path) -> np.ndarray:
+        """Load a single frame as a (1, H, W) grayscale CLAHE array."""
+        img = cv2.imread(str(path))
+        if img is None:
+            img = np.zeros((*self.target_size[::-1], 3), dtype=np.uint8)
+        return grayscale_clahe(img, self.target_size)
+
+
+class ComparativePainModel(nn.Module if TORCH_AVAILABLE else object):
+    """
+    Comparative CNN for pain detection.
+
+    Processes target and reference frames through a shared encoder, subtracts
+    the reference features from the target features, then regresses to a pain
+    score.  This mirrors the ConvNetOrdinalLateFusion architecture used in the
+    deployed pain-unbc-v2.onnx model.
+
+    Layer names are kept identical to the TaatiTeam checkpoint so that
+    layer1/layer2/layer3 weights can be transferred directly via
+    load_comparative_model(init_weights_path=...).
+
+    Input:  (B, 2, 160, 160) — channel 0 = target, channel 1 = reference
+    Output: (B, 1)           — pain score in [0, 1]  (multiply by 10 for display)
+    """
+
+    FC1_INPUT_DIM = 4608  # 6×6×128, valid for 160×160 input
+
+    def __init__(self, fc2_size: int = 200, dropout: float = 0.0):
+        if not TORCH_AVAILABLE:
+            return
+        super().__init__()
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(1, 64, kernel_size=5, stride=2),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+        )
+        self.layer2 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=5, stride=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(dropout),
+        )
+        self.layer3 = nn.Sequential(
+            nn.Conv2d(128, 128, kernel_size=5, stride=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Dropout2d(dropout),
+        )
+        self.fc1 = nn.Linear(self.FC1_INPUT_DIM, fc2_size)
+        self.fc2 = nn.Linear(fc2_size, 1)
+
+    def forward(self, x):
+        # x: (B, 2, H, W)
+        out = self.layer1(x[:, 0:1, ...])      # target branch
+        out_ref = self.layer1(x[:, 1:2, ...])  # reference branch (shared weights)
+        out = out - out_ref                     # feature-space subtraction
+        out = nn.functional.max_pool2d(out, kernel_size=2, stride=2)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        features = nn.functional.relu(self.fc1(out.reshape(out.size(0), -1)))
+        return torch.sigmoid(self.fc2(features))
+
+
+def load_comparative_model(init_weights_path: str | None = None) -> "ComparativePainModel":
+    """
+    Create a ComparativePainModel, optionally initialising shared encoder
+    layers (layer1/layer2/layer3) from a TaatiTeam checkpoint.
+
+    The fc2 output layer is always randomly initialised because the checkpoint
+    produces ordinal outputs while our model produces a single regression value.
+    """
+    model = ComparativePainModel()
+
+    if init_weights_path and Path(init_weights_path).exists():
+        checkpoint = torch.load(init_weights_path, map_location="cpu", weights_only=False)
+
+        # Accept both full-model saves and state_dict saves
+        if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+            state = checkpoint["state_dict"]
+        elif isinstance(checkpoint, dict):
+            state = checkpoint
+        else:
+            state = checkpoint.state_dict()
+
+        own_state = model.state_dict()
+        loaded, skipped = 0, 0
+        for name, param in state.items():
+            if name in own_state and own_state[name].shape == param.shape:
+                own_state[name].copy_(param)
+                loaded += 1
+            else:
+                skipped += 1
+
+        model.load_state_dict(own_state)
+        print(f"Loaded {loaded} layers from checkpoint (skipped {skipped} incompatible)")
+    else:
+        if init_weights_path:
+            print(f"WARNING: --init-weights path not found: {init_weights_path}")
+        print("Creating ComparativePainModel with random weights")
+
+    return model
 
 
 class PainDataset:
@@ -219,14 +415,23 @@ def export_onnx(model, output_path: str, input_size: tuple = (1, 3, 224, 224)):
 def main():
     parser = argparse.ArgumentParser(description="Fine-tune pain detection model")
     parser.add_argument("--data-dir", required=True, help="Path to preprocessed dataset")
-    parser.add_argument("--base-model", default=None, help="Path to base model (.pt)")
+    parser.add_argument("--base-model", default=None, help="Path to base model (.pt) — simple mode only")
     parser.add_argument("--output-dir", default="models/archive", help="Output directory for trained model")
     parser.add_argument("--version", default="0.2.0", help="Model version string")
     parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument("--batch-size", type=int, default=16, help="Batch size")
     parser.add_argument("--freeze-ratio", type=float, default=0.7, help="Fraction of early layers to freeze")
-    parser.add_argument("--target-size", type=int, default=224, help="Image input size")
+    parser.add_argument("--target-size", type=int, default=224,
+                        help="Image input size for simple mode (default 224). "
+                             "Comparative mode always uses 160.")
+    # Comparative model flags
+    parser.add_argument("--comparative", action="store_true",
+                        help="Train the comparative model (target + reference frame). "
+                             "Requires reference_filename column in labels.csv.")
+    parser.add_argument("--init-weights", default=None,
+                        help="Path to a TaatiTeam .pt checkpoint to initialise "
+                             "encoder layers (comparative mode only).")
     args = parser.parse_args()
 
     if not TORCH_AVAILABLE:
@@ -236,15 +441,23 @@ def main():
     data_dir = Path(args.data_dir)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    target_size = (args.target_size, args.target_size)
 
-    # Load datasets
+    # --- Dataset ---
     print("Loading datasets...")
-    train_ds = PainDataset(str(data_dir / "train"), target_size)
-    val_ds = PainDataset(str(data_dir / "val"), target_size)
+    if args.comparative:
+        target_size = ComparativePainDataset.DEFAULT_SIZE  # always 160×160
+        train_ds = ComparativePainDataset(str(data_dir / "train"), target_size)
+        val_ds = ComparativePainDataset(str(data_dir / "val"), target_size)
+    else:
+        target_size = (args.target_size, args.target_size)
+        train_ds = PainDataset(str(data_dir / "train"), target_size)
+        val_ds = PainDataset(str(data_dir / "val"), target_size)
 
     if len(train_ds) == 0:
         print(f"ERROR: No training samples found in {data_dir / 'train'}")
+        if args.comparative:
+            print("  Comparative mode requires a reference_filename column in labels.csv.")
+            print("  Run prepare_dataset_pemf.py to generate data with reference frames.")
         sys.exit(1)
 
     print(f"  Train: {len(train_ds)} samples")
@@ -253,11 +466,15 @@ def main():
     train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=args.batch_size) if len(val_ds) > 0 else None
 
-    # Load model
+    # --- Model ---
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
-    model = load_base_model(args.base_model)
+    if args.comparative:
+        print("Mode: comparative (target + reference frame, feature subtraction)")
+        model = load_comparative_model(args.init_weights)
+    else:
+        model = load_base_model(args.base_model)
     freeze_early_layers(model, args.freeze_ratio)
     model = model.to(device)
 
@@ -301,15 +518,33 @@ def main():
     torch.save(model, str(final_pt_path))
     print(f"Saved PyTorch model: {final_pt_path}")
 
-    # Export ONNX
+    # Export ONNX — input shape differs by model type
     final_onnx_path = output_dir / f"model-v{args.version}.onnx"
-    export_onnx(model, str(final_onnx_path), input_size=(1, 3, *target_size))
+    if args.comparative:
+        onnx_input_size = (1, 2, *ComparativePainDataset.DEFAULT_SIZE)
+    else:
+        onnx_input_size = (1, 3, *target_size)
+    export_onnx(model, str(final_onnx_path), input_size=onnx_input_size)
 
     # Save metadata
     meta = {
         "version": args.version,
         "format": "onnx",
-        "description": f"Fine-tuned pain detection model v{args.version}",
+        "comparative": args.comparative,
+        "description": (
+            f"Comparative pain detection model v{args.version} "
+            f"(target + reference frame, feature subtraction)"
+            if args.comparative else
+            f"Fine-tuned pain detection model v{args.version}"
+        ),
+        "input": (
+            "1x2x160x160 grayscale CLAHE (channel 0=target, channel 1=reference)"
+            if args.comparative else
+            f"1x3x{target_size[0]}x{target_size[1]} RGB ImageNet-normalised"
+        ),
+        "output": "1 regression value in [0,1]; multiply by 10 for 0-10 pain scale",
+        "pspi_index": -1 if args.comparative else None,
+        "pspi_max": 10,
         "training": {
             "epochs": args.epochs,
             "lr": args.lr,
@@ -319,6 +554,7 @@ def main():
             "best_epoch": best_epoch,
             "best_val_loss": round(best_val_loss, 4),
             "elapsed_s": round(elapsed, 1),
+            "init_weights": args.init_weights if args.comparative else None,
         },
     }
 
