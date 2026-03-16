@@ -924,55 +924,66 @@ html, body {
   margin-top: 8px;
 }
 
-/* ── Landscape phone ─────────────────────────────────────── */
-@media (orientation: landscape) and (max-height: 520px) {
+/* ── Tablet / landscape phone (layout fixes) ─────────────── */
+@media (max-width: 1100px) {
 
-  /* Slides: compact vertical padding, scrollable */
+  /* All slides: scrollable, reduced padding */
   .slide {
-    padding: 16px 48px 40px;
+    padding: 28px 40px 56px;
     justify-content: flex-start;
     overflow-y: auto;
   }
 
-  /* Shrink chrome */
+  /* Slide 1 — shrink brand mark so title has room */
+  #s1 .brand-mark { width: 240px; height: 240px; right: 20px; }
+
+  /* Slide 8 — drop the fixed 420px column, hide person diagram */
+  #s8 div[style*="grid-template-columns"] {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+  #s8 div[style*="grid-template-columns"] > div:last-child { display: none !important; }
+
+  /* Cards/stats: 2-col instead of 3 on mid-width screens */
+  .cards { grid-template-columns: repeat(2, 1fr); }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Landscape phone (scale + spacing) ───────────────────── */
+@media (orientation: landscape) and (max-height: 700px) {
+
+  .slide {
+    padding: 14px 40px 44px;
+    justify-content: flex-start;
+    overflow-y: auto;
+  }
+
   .nav-hint { display: none; }
   .slide-counter { bottom: 6px; font-size: 11px; }
-  #brand-corner { bottom: 6px; right: 16px; }
+  #brand-corner  { bottom: 6px; right: 14px; }
 
-  /* Scale down headlines to fit short viewport */
-  .headline { font-size: clamp(22px, 4.5vh, 40px); margin-bottom: 6px; }
-  .display  { font-size: clamp(28px, 6vh, 56px); }
-  .subhead  { font-size: clamp(14px, 3vh, 20px); }
-  .label    { font-size: 11px; letter-spacing: 0.1em; }
-  .body-text { font-size: clamp(13px, 2.5vh, 18px); }
+  /* Scale headlines to viewport height */
+  .headline   { font-size: clamp(20px, 4.5vh, 40px); margin-bottom: 4px; }
+  .display    { font-size: clamp(26px, 6vh, 56px); }
+  .subhead    { font-size: clamp(13px, 2.8vh, 20px); }
+  .label      { font-size: 10px; }
+  .body-text  { font-size: clamp(12px, 2.5vh, 17px); }
 
-  /* Slide 1 — shrink title, hide oversized brand mark */
-  #s1 .brand-mark { width: 260px; height: 260px; }
-  #s1 .main-title { font-size: clamp(42px, 10vh, 80px); margin-bottom: 12px; }
-  #s1 .subtitle   { font-size: clamp(14px, 3vh, 22px); margin-bottom: 20px; }
-  #s1 .tag-item   { font-size: 12px; padding: 5px 12px; }
+  #s1 .brand-mark { display: none; }
+  #s1 .main-title { font-size: clamp(36px, 9vh, 72px); margin-bottom: 8px; }
+  #s1 .subtitle   { font-size: clamp(13px, 3vh, 20px); margin-bottom: 16px; }
+  #s1 .tag-item   { font-size: 11px; padding: 5px 10px; }
 
-  /* Tighten content gaps across all slides */
-  #s2 .content    { gap: 20px; }
-  .au-layout      { gap: 24px !important; }
-  .key-insight    { font-size: clamp(16px, 3vh, 24px); padding: 12px 20px; margin-bottom: 16px; }
-  .timeline       { margin-top: 16px; }
-  .tl-content     { gap: 4px; }
-  .tl-head        { font-size: 15px; }
-  .tl-sub         { font-size: 13px; }
-  #s9 .workflow   { margin-top: 16px; }
-  .wf-label       { font-size: 14px; }
-  .wf-sub         { font-size: 12px; }
-  .stat-big       { font-size: clamp(32px, 7vh, 56px); }
-  .stat-name      { font-size: 16px; }
-  .stat-desc      { font-size: 13px; }
-  .closing        { font-size: clamp(15px, 3vh, 22px); }
-
-  /* Slide 8 — fixed column too wide for landscape, cap it */
-  #s8 div[style*="grid-template-columns"] {
-    grid-template-columns: 1fr 300px !important;
-    gap: 24px !important;
-  }
+  .key-insight  { font-size: clamp(14px, 3vh, 22px); padding: 10px 18px; margin-bottom: 12px; }
+  .tl-head      { font-size: 14px; }
+  .tl-sub       { font-size: 12px; }
+  .wf-label     { font-size: 13px; }
+  .wf-sub       { font-size: 11px; }
+  .stat-big     { font-size: clamp(28px, 7vh, 52px); }
+  .stat-name    { font-size: 14px; }
+  .stat-desc    { font-size: 12px; }
+  .closing      { font-size: clamp(13px, 3vh, 20px); }
 }
 </style>
 </head>
