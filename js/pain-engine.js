@@ -306,9 +306,9 @@ class PainEngine {
         let hrPainScore = null;
         let rawPain = facePain;
 
-        if (physio && this.hrBaseline && this.hrWeight > 0) {
+        if (physio && this.hrBaseline) {
             hrPainScore = this.computeHRPainScore(physio.hr, physio.hrv);
-            if (hrPainScore !== null) {
+            if (hrPainScore !== null && this.hrWeight > 0) {
                 // Weighted blend: face × (1 - weight) + physio × weight
                 rawPain = facePain * (1 - this.hrWeight) + hrPainScore * this.hrWeight;
                 rawPain = Math.max(0, Math.min(10, rawPain));
