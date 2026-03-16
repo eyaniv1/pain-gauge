@@ -329,11 +329,22 @@ header {
     gap: 12px;
 }
 
-header h1 {
-    font-size: 18px;
-    font-weight: 700;
-    color: #c0392b;
+.app-brand {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
 }
+
+.app-brand .brand-name {
+    font-size: 18px;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.app-brand .brand-algo { font-weight: 700; color: #0d1b2a; }
+.app-brand .brand-scope { font-weight: 300; color: #06B6D4; }
 
 .header-spacer {
     flex: 1;
@@ -1024,9 +1035,11 @@ footer {
     }
 
     /* Row 1: title + patient selector right-aligned */
-    header h1 {
-        font-size: 15px;
+    header .app-brand {
         order: 0;
+    }
+    header .brand-name {
+        font-size: 15px;
     }
 
     .patient-selector {
@@ -1176,7 +1189,7 @@ footer {
         padding: 6px 8px;
     }
 
-    header h1 {
+    header .brand-name {
         font-size: 14px;
     }
 
