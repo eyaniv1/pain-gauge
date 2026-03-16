@@ -29,6 +29,11 @@ class PainEngine {
         this.au43Threshold = options.au43Threshold ?? 0.55;
         this.au43Sensitivity = options.au43Sensitivity ?? 8;
         this.talkingSuppression = options.talkingSuppression ?? 0.5;
+
+        // Physiological fusion parameters
+        this.hrWeight = options.hrWeight ?? 0.3;  // 0 = face only, 1 = physio only
+        this.hrBaseline = null;  // { hr, hrv } captured during calibration
+        this._hrCalibSamples = [];
     }
 
     // ── MediaPipe Face Mesh landmark indices ──────────────────────
@@ -152,11 +157,58 @@ class PainEngine {
         }
     }
 
+    /** Capture HR baseline sample during calibration */
+    calibrateHR(hr, hrv) {
+        if (hr > 0) {
+            this._hrCalibSamples.push({ hr, hrv: hrv || 0 });
+            // Compute running average
+            const n = this._hrCalibSamples.length;
+            this.hrBaseline = {
+                hr: this._hrCalibSamples.reduce((s, v) => s + v.hr, 0) / n,
+                hrv: this._hrCalibSamples.reduce((s, v) => s + v.hrv, 0) / n,
+            };
+        }
+    }
+
+    /**
+     * Compute physiological pain contribution (0-10) from HR/HRV.
+     *
+     * Pain correlates:
+     *   - HR elevation above baseline (sympathetic activation)
+     *   - HRV suppression below baseline (reduced parasympathetic tone)
+     *
+     * Based on literature showing ~10-30 bpm elevation at high pain,
+     * and ~50% HRV reduction at moderate-severe pain.
+     */
+    computeHRPainScore(hr, hrv) {
+        if (!this.hrBaseline || this.hrBaseline.hr === 0) return null;
+
+        const base = this.hrBaseline;
+
+        // HR component: elevation from baseline → 0-5 score
+        // +30 bpm above baseline = score 5 (max contribution)
+        const hrElevation = Math.max(0, hr - base.hr);
+        const hrScore = Math.min(5, (hrElevation / 30) * 5);
+
+        // HRV component: suppression from baseline → 0-5 score
+        // 80% reduction = score 5 (max contribution)
+        let hrvScore = 0;
+        if (base.hrv > 5) { // only if baseline HRV is meaningful
+            const hrvDrop = Math.max(0, base.hrv - hrv) / base.hrv;
+            hrvScore = Math.min(5, (hrvDrop / 0.8) * 5);
+        }
+
+        // Combined: 0-10 scale (equal weight HR and HRV)
+        return Math.min(10, hrScore + hrvScore);
+    }
+
     resetCalibration() {
         this.baseline = null;
         this.baselinePainLevel = 0;
         this.smoothingWindow = [];
         this.currentScore = 0;
+        this.hrBaseline = null;
+        this._hrCalibSamples = [];
     }
 
     isCalibrated() {
@@ -169,9 +221,10 @@ class PainEngine {
      * Process a frame of face landmarks and return a pain result.
      *
      * @param {Array} landmarks - MediaPipe Face Mesh landmarks (468 points)
-     * @returns {{ score: number, rawScore: number, aus: object, pspi: number }}
+     * @param {{ hr: number, hrv: number }|null} physio - optional physiological data
+     * @returns {{ score: number, rawScore: number, aus: object, pspi: number, hrPain: number|null }}
      */
-    process(landmarks) {
+    process(landmarks, physio) {
         if (!landmarks || landmarks.length < 468) {
             return this.lastResult || { score: 0, rawScore: 0, aus: { au4: 0, au6_7: 0, au9_10: 0, au43: 0 }, pspi: 0 };
         }
@@ -228,14 +281,28 @@ class PainEngine {
         // Apply deviation bidirectionally from baseline pain level
         // Positive deviation scales into remaining range above baseline
         // Negative deviation scales into range below baseline
-        let rawPain;
+        let facePain;
         if (deviationPain >= 0) {
             const remainingRange = 10 - this.baselinePainLevel;
-            rawPain = this.baselinePainLevel + (deviationPain / 10) * remainingRange;
+            facePain = this.baselinePainLevel + (deviationPain / 10) * remainingRange;
         } else {
-            rawPain = this.baselinePainLevel + (deviationPain / 10) * this.baselinePainLevel;
+            facePain = this.baselinePainLevel + (deviationPain / 10) * this.baselinePainLevel;
         }
-        rawPain = Math.max(0, Math.min(10, rawPain));
+        facePain = Math.max(0, Math.min(10, facePain));
+
+        // ── Physiological fusion ──
+        // Blend face score with HR-based pain score when available
+        let hrPainScore = null;
+        let rawPain = facePain;
+
+        if (physio && this.hrBaseline && this.hrWeight > 0) {
+            hrPainScore = this.computeHRPainScore(physio.hr, physio.hrv);
+            if (hrPainScore !== null) {
+                // Weighted blend: face × (1 - weight) + physio × weight
+                rawPain = facePain * (1 - this.hrWeight) + hrPainScore * this.hrWeight;
+                rawPain = Math.max(0, Math.min(10, rawPain));
+            }
+        }
 
         // Temporal smoothing (exponential moving average)
         this.smoothingWindow.push(rawPain);
@@ -247,6 +314,8 @@ class PainEngine {
         this.lastResult = {
             score: Math.round(this.currentScore * 10) / 10,
             rawScore: Math.round(rawPain * 10) / 10,
+            facePain: Math.round(facePain * 10) / 10,
+            hrPain: hrPainScore !== null ? Math.round(hrPainScore * 10) / 10 : null,
             aus: {
                 au4: Math.round(Math.max(0, au4Score) * 10) / 10,
                 au6_7: Math.round(Math.max(0, au6_7Score) * 10) / 10,

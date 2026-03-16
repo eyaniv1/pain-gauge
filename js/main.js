@@ -22,6 +22,7 @@
         au43Threshold: 0.55,
         au43Sensitivity: 8,
         talkingSuppression: 0.5,
+        hrWeight: 0.3,
         smoothingSize: 8,
         sampleIntervalMs: 500,
         backendUrl: '',
@@ -113,6 +114,7 @@
         au43Threshold:      { input: 'set-au43-thresh', display: 'val-au43-thresh' },
         au43Sensitivity:    { input: 'set-au43-sens',   display: 'val-au43-sens' },
         talkingSuppression: { input: 'set-talk-supp',   display: 'val-talk-supp' },
+        hrWeight:           { input: 'set-hr-weight',   display: 'val-hr-weight' },
         smoothingSize:      { input: 'set-smooth-win',  display: 'val-smooth-win' },
         sampleIntervalMs:   { input: 'set-sample-int',  display: 'val-sample-int' },
     };
@@ -667,6 +669,7 @@
 
         if (isCalibrating) {
             engine.calibrate(landmarks);
+            if (bleHR.isActive()) engine.calibrateHR(bleHR.heartRate, bleHR.hrv);
             calibrationFrames++;
             const pct = Math.round((calibrationFrames / CALIBRATION_FRAME_COUNT) * 100);
             calibProgressBar.style.width = pct + '%';
@@ -678,15 +681,23 @@
 
         if (!engine.isCalibrated() && autoCalibFrames < AUTO_CALIB_COUNT) {
             engine.calibrate(landmarks);
+            if (bleHR.isActive()) engine.calibrateHR(bleHR.heartRate, bleHR.hrv);
             autoCalibFrames++;
             return;
         }
 
-        const result = engine.process(landmarks);
+        // Build physiological data for fusion
+        const physio = bleHR.isActive() ? { hr: bleHR.heartRate, hrv: bleHR.hrv } : null;
+        const result = engine.process(landmarks, physio);
         gauge.setScore(result.score);
         updateAUBars(result.aus);
         lastResult = result;
-        if (bleHR.simulating) bleHR.setSimPainLevel(result.score);
+        if (bleHR.simulating) bleHR.setSimPainLevel(result.facePain);
+        // Update HR pain display
+        const hrPainEl = document.getElementById('hr-pain');
+        if (hrPainEl) {
+            hrPainEl.textContent = result.hrPain !== null ? result.hrPain.toFixed(1) : '--';
+        }
         maybeRecordSample(result);
     }
 
