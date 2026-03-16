@@ -686,6 +686,13 @@
             return;
         }
 
+        // Late HR baseline capture: if sensor became active after calibration,
+        // collect samples until we have enough for a stable baseline (~10 samples)
+        if (bleHR.isActive() && bleHR.heartRate > 0 &&
+            (!engine.hrBaseline || engine._hrCalibSamples.length < 10)) {
+            engine.calibrateHR(bleHR.heartRate, bleHR.hrv);
+        }
+
         // Build physiological data for fusion
         const physio = bleHR.isActive() ? { hr: bleHR.heartRate, hrv: bleHR.hrv } : null;
         const result = engine.process(landmarks, physio);
