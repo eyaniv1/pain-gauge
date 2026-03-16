@@ -450,7 +450,7 @@ main {
 }
 
 #panel-chart {
-    position: relative;
+    background: #fff;
 }
 
 #session-chart {
