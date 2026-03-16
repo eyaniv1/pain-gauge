@@ -629,6 +629,137 @@ main {
     flex-shrink: 0;
 }
 
+/* ── Heart Rate Panel ────────────────────────────────────── */
+
+.hr-panel {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+}
+
+.hr-panel h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+    margin: 0 0 10px;
+}
+
+.hr-device-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.hr-device-name {
+    font-size: 12px;
+    color: #555;
+}
+
+.hr-status-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.hr-status-badge.connected {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.hr-status-badge.simulating {
+    background: #fff3e0;
+    color: #e65100;
+}
+
+.hr-status-badge.disconnected {
+    background: #f5f5f5;
+    color: #999;
+}
+
+.hr-metrics {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.hr-metric {
+    flex: 1;
+    text-align: center;
+    background: #fafafa;
+    border-radius: 8px;
+    padding: 8px 4px;
+}
+
+.hr-metric-value {
+    display: block;
+    font-size: 24px;
+    font-weight: 700;
+    color: #e74c3c;
+    line-height: 1.1;
+}
+
+.hr-metric-label {
+    display: block;
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.hr-metric-label small {
+    text-transform: none;
+    font-size: 9px;
+}
+
+.hr-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-hr-connect {
+    background: #e74c3c;
+    color: #fff;
+    border: none;
+    flex: 1;
+}
+
+.btn-hr-connect:hover {
+    background: #c0392b;
+}
+
+.btn-hr-sim {
+    background: #ff9800;
+    color: #fff;
+    border: none;
+    flex: 1;
+}
+
+.btn-hr-sim:hover {
+    background: #e68900;
+}
+
+.btn-hr-disconnect {
+    background: #999;
+    color: #fff;
+    border: none;
+    flex: 1;
+}
+
+.btn-hr-disconnect:hover {
+    background: #777;
+}
+
+#hr-sensor-btn.active {
+    background: #e74c3c;
+    color: #fff;
+    border-color: #c0392b;
+}
+
 /* ── Footer / Session Controls ───────────────────────────── */
 
 footer {
@@ -1104,8 +1235,9 @@ footer {
     #camera-btn { order: 12; }
     #load-video-btn { order: 13; }
     #flip-camera-btn { order: 14; }
-    #settings-btn { order: 15; }
-    .ai-status-dot { order: 16; }
+    #hr-sensor-btn { order: 15; }
+    #settings-btn { order: 16; }
+    .ai-status-dot { order: 17; }
 
     header .btn-small {
         padding: 5px 8px;

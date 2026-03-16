@@ -141,6 +141,66 @@
     const engine = new PainEngine(settings);
     const gauge = new PainGauge('gauge');
     const chart = new SessionChart('session-chart');
+    const bleHR = new BleHeartRate();
+
+    // ── Heart Rate Sensor UI ──────────────────────────────────
+
+    const hrSensorBtn = document.getElementById('hr-sensor-btn');
+    const hrPanel = document.getElementById('hr-panel');
+    const hrConnectBtn = document.getElementById('hr-connect-btn');
+    const hrSimBtn = document.getElementById('hr-sim-btn');
+    const hrDisconnectBtn = document.getElementById('hr-disconnect-btn');
+    const hrBpmEl = document.getElementById('hr-bpm');
+    const hrHrvEl = document.getElementById('hr-hrv');
+    const hrRrEl = document.getElementById('hr-rr');
+    const hrDeviceName = document.getElementById('hr-device-name');
+    const hrStatusBadge = document.getElementById('hr-status-badge');
+
+    hrSensorBtn.addEventListener('click', () => {
+        hrPanel.classList.toggle('hidden');
+        hrSensorBtn.classList.toggle('active', !hrPanel.classList.contains('hidden'));
+    });
+
+    hrConnectBtn.addEventListener('click', async () => {
+        try {
+            await bleHR.connect();
+        } catch (err) {
+            console.error('BLE connect failed:', err);
+        }
+    });
+
+    hrSimBtn.addEventListener('click', () => {
+        bleHR.startSimulation();
+    });
+
+    hrDisconnectBtn.addEventListener('click', () => {
+        bleHR.disconnect();
+    });
+
+    bleHR.onUpdate = ({ hr, hrv, rr }) => {
+        hrBpmEl.textContent = Math.round(hr);
+        hrHrvEl.textContent = hrv > 0 ? hrv.toFixed(1) : '--';
+        hrRrEl.textContent = rr > 0 ? Math.round(rr) : '--';
+
+        // Add HR to chart during recording
+        if (sessionActive) {
+            chart.addHrSample(hr);
+        }
+    };
+
+    bleHR.onStatusChange = (status) => {
+        hrStatusBadge.textContent = status === 'simulating' ? 'Simulating' :
+            status === 'connected' ? 'Connected' : 'Disconnected';
+        hrStatusBadge.className = 'hr-status-badge ' + status;
+        hrDeviceName.textContent = bleHR.getDeviceName();
+
+        const isActive = status === 'connected' || status === 'simulating';
+        hrConnectBtn.classList.toggle('hidden', isActive);
+        hrSimBtn.classList.toggle('hidden', isActive);
+        hrDisconnectBtn.classList.toggle('hidden', !isActive);
+        hrSensorBtn.classList.toggle('active', isActive);
+        if (isActive) hrPanel.classList.remove('hidden');
+    };
 
     // ── Chart zoom controls ──────────────────────────────────────
     document.getElementById('chart-zoom-in').addEventListener('click', () => chart.zoomIn());
@@ -555,6 +615,11 @@
                     pspi: result.pspi,
                     sensor_data: {
                         face: result.aus,
+                        hr: bleHR.isActive() ? {
+                            bpm: bleHR.heartRate,
+                            hrv: bleHR.hrv,
+                            rr: bleHR.rrIntervals.length > 0 ? bleHR.rrIntervals[bleHR.rrIntervals.length - 1] : null,
+                        } : undefined,
                     },
                     frame: captureFrame(),
                 };
@@ -621,6 +686,7 @@
         gauge.setScore(result.score);
         updateAUBars(result.aus);
         lastResult = result;
+        if (bleHR.simulating) bleHR.setSimPainLevel(result.score);
         maybeRecordSample(result);
     }
 

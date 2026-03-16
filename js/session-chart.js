@@ -14,16 +14,18 @@ class SessionChart {
         // Data
         this.samples = [];       // { time: seconds, score: 0-10 }
         this.aiSamples = [];     // { time: seconds, score: 0-10 } — AI scores
+        this.hrSamples = [];     // { time: seconds, bpm: number }
         this.isRecording = false;
         this.startTime = null;
         this.maxVisibleSeconds = 120; // 2 minutes visible window, scrolls
 
         // Layout
-        this.padding = { top: 30, right: 20, bottom: 40, left: 50 };
+        this.padding = { top: 30, right: 50, bottom: 40, left: 50 };
 
         // Colors
         this.pspiColor = '#2980b9';   // blue for PSPI
         this.aiColor = 'rgba(192, 57, 43, 0.5)';  // dimmer red for AI
+        this.hrColor = '#e74c3c';     // red for heart rate
 
         // Zoom
         this.zoomLevels = [30, 60, 120, 300, 600]; // seconds
@@ -38,6 +40,7 @@ class SessionChart {
     startRecording() {
         this.samples = [];
         this.aiSamples = [];
+        this.hrSamples = [];
         this.startTime = performance.now();
         this.isRecording = true;
     }
@@ -50,6 +53,7 @@ class SessionChart {
     resetRecording() {
         this.samples = [];
         this.aiSamples = [];
+        this.hrSamples = [];
         this.startTime = null;
         this.stoppedElapsed = null;
         this.isRecording = false;
@@ -64,6 +68,12 @@ class SessionChart {
 
     addAiSample(time, score) {
         this.aiSamples.push({ time, score });
+    }
+
+    addHrSample(bpm) {
+        if (!this.isRecording || this.startTime === null) return;
+        const elapsed = (performance.now() - this.startTime) / 1000;
+        this.hrSamples.push({ time: elapsed, bpm });
     }
 
     /** Load historical samples from backend (array of { timestamp_ms, score, ai_score }) */
@@ -249,6 +259,60 @@ class SessionChart {
             this._drawLine(ctx, visibleAI, chartX, chartY, chartH, timeStart, timeSpan, this.aiColor);
         }
 
+        // Plot HR data (red, secondary Y-axis: 40-180 bpm)
+        const hasHR = this.hrSamples.length > 0;
+        const visibleHR = hasHR ? this.hrSamples.filter(s => s.time >= timeStart && s.time <= timeEnd) : [];
+        const hrMin = 40, hrMax = 180;
+
+        if (visibleHR.length > 1) {
+            ctx.beginPath();
+            for (let i = 0; i < visibleHR.length; i++) {
+                const s = visibleHR[i];
+                const x = chartX + ((s.time - timeStart) / timeSpan) * chartW;
+                const y = chartY + chartH - ((s.bpm - hrMin) / (hrMax - hrMin)) * chartH;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = this.hrColor;
+            ctx.lineWidth = 1.5;
+            ctx.lineJoin = 'round';
+            ctx.setLineDash([4, 3]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Current HR dot
+            const lastHR = visibleHR[visibleHR.length - 1];
+            const dotX = chartX + ((lastHR.time - timeStart) / timeSpan) * chartW;
+            const dotY = chartY + chartH - ((lastHR.bpm - hrMin) / (hrMax - hrMin)) * chartH;
+            ctx.beginPath();
+            ctx.arc(dotX, dotY, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = this.hrColor;
+            ctx.fill();
+        }
+
+        // Right Y-axis for HR (when HR data present)
+        if (hasHR) {
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1;
+            ctx.fillStyle = this.hrColor;
+            ctx.font = '10px "Segoe UI", Arial, sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            for (let bpm = 40; bpm <= 180; bpm += 20) {
+                const y = chartY + chartH - ((bpm - hrMin) / (hrMax - hrMin)) * chartH;
+                ctx.fillText(bpm.toString(), chartX + chartW + 6, y);
+            }
+            // Right Y-axis label
+            ctx.save();
+            ctx.translate(w - 4, chartY + chartH / 2);
+            ctx.rotate(Math.PI / 2);
+            ctx.fillStyle = this.hrColor;
+            ctx.font = '10px "Segoe UI", Arial, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('BPM', 0, 0);
+            ctx.restore();
+        }
+
         // Chart border
         ctx.strokeStyle = '#ccc';
         ctx.lineWidth = 1;
@@ -261,9 +325,10 @@ class SessionChart {
         ctx.textBaseline = 'top';
         ctx.fillText(this.chartTitle || 'Session Pain History', chartX, 8);
 
-        // Legend (when AI data present)
-        if (hasAI) {
-            const legendX = chartX + chartW - 150;
+        // Legend
+        const hasLegend = hasAI || hasHR;
+        if (hasLegend) {
+            let legendX = chartX + chartW - (hasAI && hasHR ? 220 : hasHR ? 150 : 150);
             const legendY = 6;
             ctx.font = '11px "Segoe UI", Arial, sans-serif';
             ctx.textAlign = 'left';
@@ -278,15 +343,34 @@ class SessionChart {
             ctx.stroke();
             ctx.fillStyle = '#555';
             ctx.fillText('PSPI', legendX + 24, legendY);
+            legendX += 65;
 
-            // AI legend
-            ctx.strokeStyle = this.aiColor;
-            ctx.beginPath();
-            ctx.moveTo(legendX + 65, legendY + 6);
-            ctx.lineTo(legendX + 85, legendY + 6);
-            ctx.stroke();
-            ctx.fillStyle = '#555';
-            ctx.fillText('AI', legendX + 89, legendY);
+            if (hasAI) {
+                // AI legend
+                ctx.strokeStyle = this.aiColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(legendX, legendY + 6);
+                ctx.lineTo(legendX + 20, legendY + 6);
+                ctx.stroke();
+                ctx.fillStyle = '#555';
+                ctx.fillText('AI', legendX + 24, legendY);
+                legendX += 50;
+            }
+
+            if (hasHR) {
+                // HR legend (dashed)
+                ctx.strokeStyle = this.hrColor;
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 3]);
+                ctx.beginPath();
+                ctx.moveTo(legendX, legendY + 6);
+                ctx.lineTo(legendX + 20, legendY + 6);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#555';
+                ctx.fillText('HR', legendX + 24, legendY);
+            }
         }
 
         // Stats
@@ -301,6 +385,12 @@ class SessionChart {
                 const aiAvg = aiScores.reduce((a, b) => a + b, 0) / aiScores.length;
                 const aiMax = Math.max(...aiScores);
                 statsText += `  |  AI Avg: ${aiAvg.toFixed(1)}  Peak: ${aiMax.toFixed(1)}`;
+            }
+
+            if (hasHR) {
+                const hrBpms = this.hrSamples.map(s => s.bpm);
+                const hrAvg = hrBpms.reduce((a, b) => a + b, 0) / hrBpms.length;
+                statsText += `  |  HR Avg: ${Math.round(hrAvg)}`;
             }
 
             statsText += `  |  ${this._formatTime(elapsed)}`;
