@@ -665,11 +665,16 @@ footer {
     border-color: #0891B2;
     text-decoration: none;
     white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .btn-about:hover {
     background: #0891B2;
 }
+
+.about-icon { display: none; }
 
 /* ── Settings Panel ──────────────────────────────────────── */
 
@@ -1059,6 +1064,10 @@ footer {
         order: 1;
         margin-left: auto;
     }
+
+    .btn-about .about-text { display: none; }
+    .btn-about { padding: 6px 8px; }
+    .about-icon { display: block; }
 
     /* Line break after row 1 */
     .header-spacer {
