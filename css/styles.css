@@ -659,6 +659,22 @@ footer {
     gap: 4px;
 }
 
+.about-link {
+    font-size: 12px;
+    color: #06B6D4;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    opacity: 0.65;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+}
+
+.about-link:hover {
+    opacity: 1;
+}
+
 /* ── Settings Panel ──────────────────────────────────────── */
 
 .settings-panel {
