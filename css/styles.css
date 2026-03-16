@@ -1151,8 +1151,8 @@ footer {
 
     .panels-container {
         flex: none;
-        height: auto;
-        min-height: 56vw;
+        height: 56vw;
+        min-height: 220px;
     }
 
     #panel-history.active {

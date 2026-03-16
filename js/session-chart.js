@@ -98,18 +98,21 @@ class SessionChart {
 
     _resizeCanvas() {
         const rect = this.canvas.getBoundingClientRect();
+        if (rect.width < 1 || rect.height < 1) return false;
         const dpr = window.devicePixelRatio || 1;
         this.canvas.width = rect.width * dpr;
         this.canvas.height = rect.height * dpr;
         this.ctx.scale(dpr, dpr);
         this._displayWidth = rect.width;
         this._displayHeight = rect.height;
+        return true;
     }
 
     _startRender() {
         const render = () => {
-            this._resizeCanvas();
-            this._draw();
+            if (this._resizeCanvas()) {
+                this._draw();
+            }
             this._animFrame = requestAnimationFrame(render);
         };
         render();
