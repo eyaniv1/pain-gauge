@@ -177,24 +177,35 @@ class PainEngine {
      *   - HR elevation above baseline (sympathetic activation)
      *   - HRV suppression below baseline (reduced parasympathetic tone)
      *
-     * Based on literature showing ~10-30 bpm elevation at high pain,
-     * and ~50% HRV reduction at moderate-severe pain.
+     * The baseline pain level is accounted for: if calibrated at pain 5,
+     * the captured HR already reflects that pain. We estimate the resting
+     * HR by subtracting the expected pain-related elevation, then measure
+     * deviation from that estimated rest state.
+     *
+     * Based on literature: ~3 bpm per pain level, ~8% HRV drop per pain level.
      */
     computeHRPainScore(hr, hrv) {
         if (!this.hrBaseline || this.hrBaseline.hr === 0) return null;
 
         const base = this.hrBaseline;
+        const bpl = this.baselinePainLevel;
 
-        // HR component: elevation from baseline → 0-5 score
-        // +30 bpm above baseline = score 5 (max contribution)
-        const hrElevation = Math.max(0, hr - base.hr);
+        // Estimate true resting values by removing pain-related component
+        // ~3 bpm elevation per pain level (literature: 10-30 bpm at pain 10)
+        const estimatedRestHR = base.hr - (bpl * 3);
+        // ~8% HRV suppression per pain level (literature: ~80% at pain 10)
+        const estimatedRestHRV = base.hrv > 0 ? base.hrv / Math.max(0.2, 1 - bpl * 0.08) : 0;
+
+        // HR component: elevation from estimated rest → 0-5 score
+        // +30 bpm above rest = score 5 (max contribution)
+        const hrElevation = Math.max(0, hr - estimatedRestHR);
         const hrScore = Math.min(5, (hrElevation / 30) * 5);
 
-        // HRV component: suppression from baseline → 0-5 score
+        // HRV component: suppression from estimated rest → 0-5 score
         // 80% reduction = score 5 (max contribution)
         let hrvScore = 0;
-        if (base.hrv > 5) { // only if baseline HRV is meaningful
-            const hrvDrop = Math.max(0, base.hrv - hrv) / base.hrv;
+        if (estimatedRestHRV > 5) {
+            const hrvDrop = Math.max(0, estimatedRestHRV - hrv) / estimatedRestHRV;
             hrvScore = Math.min(5, (hrvDrop / 0.8) * 5);
         }
 
