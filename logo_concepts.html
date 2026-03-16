@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algoscope — Logo Concepts</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #030B18;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 56px 24px 72px;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+  .header { text-align: center; margin-bottom: 52px; }
+  .header-eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    color: #06B6D4;
+    margin-bottom: 10px;
+  }
+  .header-title {
+    font-size: 26px;
+    font-weight: 300;
+    color: #CBD5E1;
+    letter-spacing: 1px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 840px;
+    width: 100%;
+  }
+  .card {
+    background: #0C1526;
+    border: 1px solid #152035;
+    border-radius: 14px;
+    padding: 32px 28px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    cursor: pointer;
+    transition: border-color 0.25s, background 0.25s;
+  }
+  .card:hover { border-color: #1E3A5F; background: #0E1A2E; }
+  .card svg { width: 100%; height: auto; }
+  .card-label {
+    font-size: 10.5px;
+    color: #2A3F5C;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    align-self: flex-end;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-eyebrow">Algoscope</div>
+  <div class="header-title">Logo Concepts</div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const NS = 'http://www.w3.org/2000/svg';
+const rad = d => d * Math.PI / 180;
+const pt  = (cx, cy, r, deg) => [cx + r * Math.cos(rad(deg)), cy + r * Math.sin(rad(deg))];
+const f   = n => (+n).toFixed(2);
+
+function mkSVG(w, h) {
+  const s = document.createElementNS(NS, 'svg');
+  s.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  s.setAttribute('width', w);
+  s.setAttribute('height', h);
+  return s;
+}
+
+function mk(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function addText(svg, tx, ty) {
+  const ff = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+  const nameEl = mk('text', {
+    x: tx, y: ty + 16,
+    'font-family': ff, 'font-size': '26', 'letter-spacing': '-0.3'
+  }, svg);
+  const sp1 = document.createElementNS(NS, 'tspan');
+  sp1.setAttribute('font-weight', '700');
+  sp1.setAttribute('fill', '#F1F5F9');
+  sp1.textContent = 'Algo';
+  nameEl.appendChild(sp1);
+  const sp2 = document.createElementNS(NS, 'tspan');
+  sp2.setAttribute('font-weight', '300');
+  sp2.setAttribute('fill', '#06B6D4');
+  sp2.textContent = 'scope';
+  nameEl.appendChild(sp2);
+
+  const tagEl = mk('text', {
+    x: tx, y: ty + 42,
+    'font-family': ff, 'font-size': '10', 'fill': '#3D5470',
+    'font-style': 'italic', 'letter-spacing': '0.3'
+  }, svg);
+  tagEl.textContent = "See what patients can't say.";
+}
+
+// ── A: Scope + Signal ──────────────────────────────────────
+function makeA() {
+  const s = mkSVG(310, 110);
+  const defs = mk('defs', {}, s);
+  const cp = mk('clipPath', {id: 'cA'}, defs);
+  mk('circle', {cx: 55, cy: 55, r: 47}, cp);
+
+  mk('circle', {cx:55, cy:55, r:50, fill:'none', stroke:'#06B6D4', 'stroke-width':'2'}, s);
+
+  [[3,55,7,55],[103,55,107,55],[55,3,55,7],[55,103,55,107]].forEach(([x1,y1,x2,y2]) =>
+    mk('line', {x1,y1,x2,y2, stroke:'#06B6D4', 'stroke-width':'1.5'}, s));
+
+  const g = mk('g', {'clip-path':'url(#cA)', opacity:'0.18'}, s);
+  mk('line', {x1:5,y1:55,x2:105,y2:55, stroke:'#06B6D4','stroke-width':'0.8'}, g);
+  mk('line', {x1:55,y1:5,x2:55,y2:105, stroke:'#06B6D4','stroke-width':'0.8'}, g);
+
+  mk('polyline', {
+    points: '5,55 26,55 34,26 43,84 50,40 58,55 105,55',
+    fill:'none', stroke:'#06B6D4', 'stroke-width':'2.5',
+    'stroke-linecap':'round', 'stroke-linejoin':'round',
+    'clip-path':'url(#cA)'
+  }, s);
+
+  mk('circle', {cx:55,cy:55,r:2.5,fill:'#06B6D4'}, s);
+  addText(s, 122, 32);
+  return s;
+}
+
+// ── B: Aperture (colored ring segments) ───────────────────
+function makeB() {
+  const s = mkSVG(310, 110);
+  const cx=55, cy=55, ri=18, ro=52;
+  const colors = ['#6366F1','#14B8A6','#F59E0B','#F87171','#A855F7','#22C55E'];
+
+  for (let i = 0; i < 6; i++) {
+    const a1 = -90 + i * 60;
+    const a2 = a1 + 55;
+    const [ix1,iy1] = pt(cx,cy,ri,a1);
+    const [ox1,oy1] = pt(cx,cy,ro,a1);
+    const [ix2,iy2] = pt(cx,cy,ri,a2);
+    const [ox2,oy2] = pt(cx,cy,ro,a2);
+    const d = `M${f(ix1)},${f(iy1)} L${f(ox1)},${f(oy1)} A${ro},${ro},0,0,1,${f(ox2)},${f(oy2)} L${f(ix2)},${f(iy2)} A${ri},${ri},0,0,0,${f(ix1)},${f(iy1)} Z`;
+    mk('path', {d, fill:colors[i]}, s);
+  }
+
+  mk('circle', {cx,cy,r:4.5,fill:'#F1F5F9',opacity:'0.9'}, s);
+  addText(s, 122, 32);
+  return s;
+}
+
+// ── C: Multi-channel Waves + Scope ring ───────────────────
+function makeC() {
+  const s = mkSVG(310, 110);
+  const cx=55, cy=55, r=50;
+
+  const defs = mk('defs', {}, s);
+  const cp = mk('clipPath', {id:'cC'}, defs);
+  mk('circle', {cx, cy, r:r-3}, cp);
+
+  // Icon background clipped to circle
+  mk('circle', {cx, cy, r:r-3, fill:'#06101E'}, s);
+
+  const channels = [
+    {y:24, color:'#7C3AED', phase:0},
+    {y:55, color:'#0EA5E9', phase:Math.PI*0.66},
+    {y:86, color:'#84CC16', phase:Math.PI*1.33},
+  ];
+  const amp=11, period=76;
+
+  // Dividers between channels (clipped)
+  [38,72].forEach(y => mk('line', {
+    x1:0, y1:y, x2:110, y2:y,
+    stroke:'#111E32', 'stroke-width':'1', 'clip-path':'url(#cC)'
+  }, s));
+
+  channels.forEach(ch => {
+    mk('line', {x1:0,y1:ch.y,x2:110,y2:ch.y,stroke:ch.color,'stroke-width':'0.5',opacity:'0.15','clip-path':'url(#cC)'}, s);
+    mk('circle', {cx:10,cy:ch.y,r:2.5,fill:ch.color,opacity:'0.75','clip-path':'url(#cC)'}, s);
+    const pts = [];
+    for (let x = 0; x <= 110; x += 4) {
+      const y = ch.y + amp * Math.sin(2*Math.PI*x/period + ch.phase);
+      pts.push(`${x},${f(y)}`);
+    }
+    mk('polyline', {
+      points: pts.join(' '),
+      fill:'none', stroke:ch.color, 'stroke-width':'1.8',
+      'stroke-linecap':'round', 'stroke-linejoin':'round',
+      opacity:'0.92', 'clip-path':'url(#cC)'
+    }, s);
+  });
+
+  // Scope ring
+  mk('circle', {cx, cy, r, fill:'none', stroke:'#06B6D4', 'stroke-width':'2'}, s);
+
+  // Tick marks (cardinal points, extending just outside the ring)
+  [[3,55,7,55],[103,55,107,55],[55,3,55,7],[55,103,55,107]].forEach(([x1,y1,x2,y2]) =>
+    mk('line', {x1,y1,x2,y2, stroke:'#06B6D4', 'stroke-width':'1.5'}, s));
+
+  // Subtle 45° corner marks (shorter)
+  const d45 = r * Math.cos(rad(45));
+  [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([sx,sy]) => {
+    const bx = f(cx + sx*(d45+1)), by = f(cy + sy*(d45+1));
+    const ex = f(cx + sx*(d45+6)), ey = f(cy + sy*(d45+6));
+    mk('line', {x1:bx,y1:by,x2:ex,y2:ey, stroke:'#06B6D4','stroke-width':'1',opacity:'0.45'}, s);
+  });
+
+  addText(s, 122, 32);
+  return s;
+}
+
+// ── D: Gauge Arc ───────────────────────────────────────────
+function makeD() {
+  const s = mkSVG(310, 110);
+  const cx=55, cy=95, r=46;
+  const defs = mk('defs', {}, s);
+  const grd = mk('linearGradient', {id:'gD',x1:'0%',y1:'0%',x2:'100%',y2:'0%'}, defs);
+  mk('stop', {offset:'0%','stop-color':'#1D4ED8'}, grd);
+  mk('stop', {offset:'50%','stop-color':'#0EA5E9'}, grd);
+  mk('stop', {offset:'100%','stop-color':'#FBBF24'}, grd);
+
+  mk('path', {
+    d:`M${cx-r},${cy} A${r},${r},0,0,1,${cx+r},${cy}`,
+    fill:'none', stroke:'#101C30', 'stroke-width':'10', 'stroke-linecap':'round'
+  }, s);
+  mk('path', {
+    d:`M${cx-r},${cy} A${r},${r},0,0,1,${cx+r},${cy}`,
+    fill:'none', stroke:'url(#gD)', 'stroke-width':'7', 'stroke-linecap':'round'
+  }, s);
+
+  // 5 tick marks
+  [0,45,90,135,180].forEach(deg => {
+    const mathDeg = 180 - deg;
+    const x1 = f(cx + (r+3)*Math.cos(rad(mathDeg)));
+    const y1 = f(cy - (r+3)*Math.sin(rad(mathDeg)));
+    const x2 = f(cx + (r+11)*Math.cos(rad(mathDeg)));
+    const y2 = f(cy - (r+11)*Math.sin(rad(mathDeg)));
+    mk('line', {x1,y1,x2,y2,stroke:'#1A304F','stroke-width':'1.5'}, s);
+  });
+
+  // Needle at 72% — optimistic reading
+  const mathDeg = 180 - 72 * 1.8;
+  const nx = f(cx + (r-9)*Math.cos(rad(mathDeg)));
+  const ny = f(cy - (r-9)*Math.sin(rad(mathDeg)));
+  mk('line', {x1:cx,y1:cy,x2:nx,y2:ny,stroke:'#FBBF24','stroke-width':'2.5','stroke-linecap':'round'}, s);
+  mk('circle', {cx,cy,r:5.5,fill:'#0C1526',stroke:'#1E3A5F','stroke-width':'1.5'}, s);
+  mk('circle', {cx,cy,r:2.5,fill:'#FBBF24'}, s);
+
+  addText(s, 122, 32);
+  return s;
+}
+
+// ── Build grid ─────────────────────────────────────────────
+const grid = document.getElementById('grid');
+[
+  [makeA, 'A — Scope + Signal'],
+  [makeB, 'B — Aperture'],
+  [makeC, 'C — Multi-channel'],
+  [makeD, 'D — Gauge Arc'],
+].forEach(([fn, label]) => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.appendChild(fn());
+  const lbl = document.createElement('div');
+  lbl.className = 'card-label';
+  lbl.textContent = label;
+  card.appendChild(lbl);
+  grid.appendChild(card);
+});
+</script>
+</body>
+</html>
