@@ -18,6 +18,7 @@ except ImportError:
 
 from prepare_dataset_pemf import (
     PEMF_AU_COLUMNS,
+    _extract_subject_from_clip_id,
     _map_columns,
     _parse_row,
     assign_reference_frames,
@@ -27,6 +28,7 @@ from prepare_dataset_pemf import (
     find_excel_file,
     find_pictures_dir,
     make_output_filename,
+    parse_european_mean,
     preprocess_image,
     split_by_subject,
     write_split,
@@ -45,24 +47,36 @@ def make_frame(path, width=452, height=549):
     cv2.imwrite(str(path), img)
 
 
-def make_excel(path, rows):
+def make_excel(path, rows, real_format=False):
     """
     Create a minimal PEMF_Database.xlsx.
 
     rows: list of dicts with keys matching expected column names.
+    real_format: use the actual PEMF column names (Clip, Kind, Intensity).
     """
     wb = openpyxl.Workbook()
     ws = wb.active
-    # Header
-    headers = ["Subject", "Condition", "ClipID", "PainIntensity"] + PEMF_AU_COLUMNS
-    ws.append(headers)
-    for row in rows:
-        ws.append([
-            row.get("Subject"),
-            row.get("Condition"),
-            row.get("ClipID"),
-            row.get("PainIntensity"),
-        ] + [row.get(au, 0) for au in PEMF_AU_COLUMNS])
+    if real_format:
+        headers = ["Clip", "Age", "Gender", "Kind", "Intensity"] + PEMF_AU_COLUMNS
+        ws.append(headers)
+        for row in rows:
+            ws.append([
+                row.get("Clip"),
+                row.get("Age", 30),
+                row.get("Gender", "F"),
+                row.get("Kind"),
+                row.get("Intensity"),
+            ] + [row.get(au, 0) for au in PEMF_AU_COLUMNS])
+    else:
+        headers = ["Subject", "Condition", "ClipID", "PainIntensity"] + PEMF_AU_COLUMNS
+        ws.append(headers)
+        for row in rows:
+            ws.append([
+                row.get("Subject"),
+                row.get("Condition"),
+                row.get("ClipID"),
+                row.get("PainIntensity"),
+            ] + [row.get(au, 0) for au in PEMF_AU_COLUMNS])
     wb.save(str(path))
 
 
@@ -107,6 +121,42 @@ def mock_dataset(tmp_path):
             clip_counter += 1
 
     make_excel(tmp_path / "PEMF_Database.xlsx", excel_rows)
+    return tmp_path
+
+
+@pytest.fixture
+def mock_dataset_real(tmp_path):
+    """
+    Create a mock dataset matching the REAL PEMF Excel format.
+
+    Uses composite clip IDs (S001A, S001L, S001N, S001P) and
+    European-formatted intensity values.
+    """
+    pictures_dir = tmp_path / "Pictures"
+    excel_rows = []
+
+    for subj_num in (1, 2, 3):
+        for suffix, kind, intensity in [
+            ("N", "Neutral", "0,28 (0,86)"),
+            ("A", "Algometer", "5,20 (2,516)"),
+            ("L", "Laser", "3,82 (2)"),
+            ("P", "Posed", "4,50 (1,2)"),
+        ]:
+            clip_id = f"S{subj_num:03d}{suffix}"
+            clip_folder = pictures_dir / clip_id
+            clip_folder.mkdir(parents=True)
+            for i in range(5):
+                make_frame(clip_folder / f"frame_{i:02d}.jpg")
+
+            excel_rows.append({
+                "Clip": clip_id,
+                "Kind": kind,
+                "Intensity": intensity,
+                "AU4": 3 if suffix != "N" else 0,
+                "AU6": 2 if suffix != "N" else 0,
+            })
+
+    make_excel(tmp_path / "PEMF_Database.xlsx", excel_rows, real_format=True)
     return tmp_path
 
 
@@ -160,6 +210,57 @@ class TestFindPicturesDir:
 # TestColumnMapping
 # ---------------------------------------------------------------------------
 
+class TestParseEuropeanMean:
+    def test_european_with_sd(self):
+        assert parse_european_mean("5,20 (2,516)") == pytest.approx(5.20)
+
+    def test_european_no_space(self):
+        assert parse_european_mean("3,82(2)") == pytest.approx(3.82)
+
+    def test_european_low_value(self):
+        assert parse_european_mean("0,28 (0,86)") == pytest.approx(0.28)
+
+    def test_already_numeric(self):
+        assert parse_european_mean(4.0) == 4.0
+
+    def test_integer(self):
+        assert parse_european_mean(3) == 3.0
+
+    def test_none(self):
+        assert parse_european_mean(None) is None
+
+    def test_empty_string(self):
+        assert parse_european_mean("") is None
+
+    def test_plain_european_decimal(self):
+        assert parse_european_mean("7,50") == pytest.approx(7.50)
+
+
+class TestExtractSubjectFromClipId:
+    def test_s001a(self):
+        subj, suffix = _extract_subject_from_clip_id("S001A")
+        assert subj == "S001"
+        assert suffix == "A"
+
+    def test_s068p(self):
+        subj, suffix = _extract_subject_from_clip_id("S068P")
+        assert subj == "S068"
+        assert suffix == "P"
+
+    def test_s001n(self):
+        subj, suffix = _extract_subject_from_clip_id("S001N")
+        assert subj == "S001"
+        assert suffix == "N"
+
+    def test_plain_number(self):
+        subj, suffix = _extract_subject_from_clip_id("42")
+        assert subj == "42"
+
+    def test_empty_string(self):
+        subj, suffix = _extract_subject_from_clip_id("")
+        assert subj == ""
+
+
 class TestColumnMapping:
     def test_maps_subject_column(self):
         headers = ["Subject", "Condition", "ClipID", "PainIntensity"]
@@ -182,6 +283,24 @@ class TestColumnMapping:
         col_idx = _map_columns(headers)
         assert "AU4" in col_idx
         assert "AU6" in col_idx
+
+    def test_real_pemf_columns(self):
+        """Mapping with real PEMF column names."""
+        headers = ["Clip", "Age", "Gender", "Kind", "Intensity", "Valence",
+                    "Arousal", "Real %", "Fake %", "AU4", "AU6"]
+        col_idx = _map_columns(headers)
+        assert col_idx.get("clip_id") == 0       # "Clip"
+        assert col_idx.get("clip_type") == 3      # "Kind"
+        assert col_idx.get("pain_rating") == 4    # "Intensity"
+        assert col_idx.get("AU4") == 9
+        # Subject column absent — extracted from clip_id later
+        assert "subject" not in col_idx
+
+    def test_clip_id_and_type_dont_overlap(self):
+        """Clip ID and clip type should never map to the same column."""
+        headers = ["Clip", "Kind", "Intensity"]
+        col_idx = _map_columns(headers)
+        assert col_idx.get("clip_id") != col_idx.get("clip_type")
 
 
 # ---------------------------------------------------------------------------
@@ -231,11 +350,78 @@ class TestParseRow:
         record = _parse_row(row, headers, col_idx, 6)
         assert record["aus"]["AU4"] == 1
 
-    def test_returns_none_on_missing_subject(self):
+    def test_missing_subject_falls_back_to_clip_id(self):
         col_idx, headers = self._make_col_idx()
         row = (None, "co2", "006", 2.0) + tuple(0 for _ in PEMF_AU_COLUMNS)
         record = _parse_row(row, headers, col_idx, 7)
+        # Subject=None falls back to extracting from clip_id "006"
+        assert record is not None
+        assert record["subject_id"] == "006"
+
+    def test_returns_none_on_empty_clip_id_and_subject(self):
+        col_idx, headers = self._make_col_idx()
+        row = (None, "co2", "", 2.0) + tuple(0 for _ in PEMF_AU_COLUMNS)
+        record = _parse_row(row, headers, col_idx, 7)
+        # Both subject and clip_id are empty — can't determine subject
         assert record is None
+
+
+class TestParseRowRealPEMF:
+    """Tests using the actual PEMF Excel column structure."""
+
+    def _make_real_col_idx(self):
+        headers = ["Clip", "Age", "Gender", "Kind", "Intensity",
+                    "Valence", "Arousal", "Real %", "Fake %",
+                    "Disgust %", "Fear %", "Sadness %", "Surprise %",
+                    "Happiness %", "Anger %", "Any %", "Luminosity",
+                    "AU4", "AU6", "AU7", "AU9", "AU10", "AU12",
+                    "AU20", "AU25", "AU26", "AU27", "AU43", "AU45"]
+        return _map_columns(headers), headers
+
+    def test_parses_subject_from_clip_id(self):
+        col_idx, headers = self._make_real_col_idx()
+        row = ("S001A", 32, "F", "Algometer", "5,20 (2,516)",
+               "2,67", "6,88", "23.9", "76.1",
+               "4.4", "8.3", "0.3", "23.4", "18.4", "31.2", "13.9", "178.7",
+               0, 6, 6, 6, 4, 6, 1, 6, 5, 6, 5, 0)
+        record = _parse_row(row, headers, col_idx, 2)
+        assert record is not None
+        assert record["subject_id"] == "S001"
+        assert record["clip_id"] == "S001A"
+        assert record["clip_type"] == "algometer"
+
+    def test_parses_european_intensity(self):
+        col_idx, headers = self._make_real_col_idx()
+        row = ("S001A", 32, "F", "Algometer", "5,20 (2,516)",
+               "2,67", "6,88", "23.9", "76.1",
+               "4.4", "8.3", "0.3", "23.4", "18.4", "31.2", "13.9", "178.7",
+               0, 6, 6, 6, 4, 6, 1, 6, 5, 6, 5, 0)
+        record = _parse_row(row, headers, col_idx, 2)
+        assert record["pain_score_raw"] == pytest.approx(5.20)
+        assert record["pain_score_pspi"] == pytest.approx(10.40)
+
+    def test_neutral_has_zero_pain(self):
+        col_idx, headers = self._make_real_col_idx()
+        row = ("S001N", 32, "F", "Neutral", "0,28 (0,86)",
+               "5,24", "1,71", "71.3", "28.7",
+               "0.4", "1.3", "2.1", "3.8", "57.8", "0.0", "34.6", "144.7",
+               0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 6)
+        record = _parse_row(row, headers, col_idx, 4)
+        assert record["is_neutral"] is True
+        assert record["pain_score_raw"] == 0.0
+        assert record["pain_score_pspi"] == 0.0
+
+    def test_au_intensities_preserved(self):
+        col_idx, headers = self._make_real_col_idx()
+        row = ("S001L", 32, "F", "Laser", "3,82 (2)",
+               "2,91", "4,89", "42.0", "58.0",
+               "8.9", "9.3", "2.7", "23.1", "1.8", "16.9", "37.3", "144.6",
+               1, 4, 1, 5, 2, 1, 0, 6, 4, 4, 1, 6)
+        record = _parse_row(row, headers, col_idx, 3)
+        assert record["aus"]["AU4"] == 1
+        assert record["aus"]["AU6"] == 4
+        assert record["aus"]["AU9"] == 5
+        assert record["aus"]["AU25"] == 6
 
 
 # ---------------------------------------------------------------------------
@@ -534,3 +720,75 @@ class TestMakeOutputFilename:
         sample = {"subject_id": "S001", "clip_type": "cold pressor", "clip_id": "001", "frame_idx": 0}
         filename = make_output_filename(sample)
         assert " " not in filename
+
+
+# ---------------------------------------------------------------------------
+# TestRealPEMFFormat — End-to-end with actual PEMF column names
+# ---------------------------------------------------------------------------
+
+class TestRealPEMFFormat:
+    """Integration tests using the real PEMF Excel column format."""
+
+    def _get_records(self, mock_dataset_real):
+        from prepare_dataset_pemf import load_excel_labels
+        excel_path = find_excel_file(mock_dataset_real)
+        return load_excel_labels(excel_path)
+
+    def test_loads_all_records(self, mock_dataset_real):
+        records = self._get_records(mock_dataset_real)
+        # 3 subjects × 4 clips = 12
+        assert len(records) == 12
+
+    def test_subject_extracted_from_clip_id(self, mock_dataset_real):
+        records = self._get_records(mock_dataset_real)
+        subjects = set(r["subject_id"] for r in records)
+        assert subjects == {"S001", "S002", "S003"}
+
+    def test_clip_types_correct(self, mock_dataset_real):
+        records = self._get_records(mock_dataset_real)
+        types = set(r["clip_type"] for r in records)
+        assert "algometer" in types
+        assert "laser" in types
+        assert "neutral" in types
+        assert "posed" in types
+
+    def test_intensity_parsed_from_european(self, mock_dataset_real):
+        records = self._get_records(mock_dataset_real)
+        alg = [r for r in records if r["clip_type"] == "algometer"][0]
+        assert alg["pain_score_raw"] == pytest.approx(5.20)
+
+    def test_neutral_has_zero_pain(self, mock_dataset_real):
+        records = self._get_records(mock_dataset_real)
+        neutrals = [r for r in records if r["is_neutral"]]
+        assert all(r["pain_score_raw"] == 0.0 for r in neutrals)
+
+    def test_collect_samples_finds_all_frames(self, mock_dataset_real):
+        records = self._get_records(mock_dataset_real)
+        pictures_dir = find_pictures_dir(mock_dataset_real)
+        samples, neutral_map = collect_samples(records, pictures_dir)
+        # 12 clips × 5 frames = 60
+        assert len(samples) == 60
+
+    def test_full_pipeline(self, mock_dataset_real, tmp_path):
+        """End-to-end: load → split → write → check output."""
+        records = self._get_records(mock_dataset_real)
+        pictures_dir = find_pictures_dir(mock_dataset_real)
+        samples, neutral_map = collect_samples(records, pictures_dir)
+        assign_reference_frames(samples, neutral_map)
+
+        # Only pain samples
+        pain_samples = [s for s in samples if not s["is_neutral"]]
+        train, val, test = split_by_subject(pain_samples)
+
+        output_dir = tmp_path / "output"
+        all_map = build_filename_map(samples)
+        n = write_split(train, "train", output_dir, all_samples_filename_map=all_map)
+        assert n > 0
+
+        # Verify CSV has reference filenames
+        import csv
+        with open(output_dir / "train" / "labels.csv") as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        refs = [r["reference_filename"] for r in rows if r["reference_filename"]]
+        assert len(refs) > 0

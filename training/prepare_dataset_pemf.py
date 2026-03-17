@@ -5,15 +5,17 @@ Open-access dataset: https://osf.io/3hgca/?view_only=12b04cd8164d4a6784c04b8c83b
 Paper: doi.org/10.3758/s13428-022-01992-4
 
 272 clips from 68 subjects × 4 clip types:
-  - Neutral expression
-  - CO2 laser-induced spontaneous pain
-  - Algometer-induced spontaneous pain
-  - Posed pain
+  - Neutral expression (suffix N)
+  - Laser-induced spontaneous pain (suffix L)
+  - Algometer-induced spontaneous pain (suffix A)
+  - Posed pain (suffix P)
 
 Each clip has 20 extracted still frames. Labels are in PEMF_Database.xlsx:
+  - Columns: Clip (e.g. S001A), Kind, Intensity (mean(SD) in European decimal format),
+             AU4..AU45 (0-6 inter-rater agreement intensity)
   - Pain intensity: 9-point Likert scale (0-8), normalized to PSPI-equivalent (×2 = 0-16)
-  - AU presence: binary (12 AUs: AU4, AU6, AU7, AU9, AU10, AU12, AU20, AU25, AU26, AU27, AU43, AU45)
-  - Neutral clips: pain_score = 0, all AUs absent
+  - AU values: 0-6 (number of raters who coded AU present)
+  - Neutral clips: pain_score = 0
 
 For comparative model training, the corresponding neutral clip from each subject is recorded
 as a reference in labels.csv (reference_filename column).
@@ -50,12 +52,15 @@ except ImportError:
     sys.exit(1)
 
 
-# PEMF AU columns present in the Excel file (binary: present/absent)
+# PEMF AU columns (0-6 intensity scale in the real dataset, 6 = max rater agreement)
 PEMF_AU_COLUMNS = ["AU4", "AU6", "AU7", "AU9", "AU10", "AU12", "AU20", "AU25", "AU26", "AU27", "AU43", "AU45"]
 
 # Clip type strings to look for in Excel (case-insensitive)
 NEUTRAL_KEYWORDS = ("neutral", "base", "baseline", "rest")
-PAIN_KEYWORDS = ("co2", "laser", "algometer", "alg", "posed", "pain")
+PAIN_KEYWORDS = ("laser", "algometer", "alg", "posed", "pain")
+
+# Suffix → type mapping for composite clip IDs like "S001A"
+CLIP_SUFFIX_MAP = {"a": "algometer", "l": "laser", "n": "neutral", "p": "posed"}
 
 
 def find_excel_file(dataset_root: Path) -> Path | None:
@@ -122,29 +127,58 @@ def load_excel_labels(excel_path: Path) -> list[dict]:
     return records
 
 
+def parse_european_mean(value) -> float | None:
+    """
+    Parse a European-formatted mean(SD) string into a float.
+
+    Examples:
+        "5,20 (2,516)" → 5.20
+        "3,82 (2)"     → 3.82
+        "0,28 (0,86)"  → 0.28
+        3.5             → 3.5   (already numeric)
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    s = str(value).strip()
+    if not s:
+        return None
+    # Strip parenthesised SD portion
+    if "(" in s:
+        s = s[:s.index("(")].strip()
+    # European comma → dot
+    s = s.replace(",", ".")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 def _map_columns(headers: list[str]) -> dict:
     """Map semantic column names to indices."""
     h_lower = [h.lower() for h in headers]
     col_idx = {}
 
-    # Subject ID
-    for kw in ("subject", "participant", "id", "subj"):
+    # Subject ID (may be absent in real PEMF — extracted from Clip column later)
+    for kw in ("subject", "participant", "subj"):
         for i, h in enumerate(h_lower):
             if kw in h and "subject" not in col_idx:
                 col_idx["subject"] = i
                 break
 
-    # Clip/condition type
-    for kw in ("condition", "type", "stimulus", "clip", "expression", "category"):
+    # Clip/condition type — "kind" first (real PEMF), then generic keywords
+    for kw in ("kind", "condition", "type", "stimulus", "expression", "category"):
         for i, h in enumerate(h_lower):
             if kw in h and "clip_type" not in col_idx:
                 col_idx["clip_type"] = i
                 break
 
-    # Clip ID / label
-    for kw in ("clip", "video", "label", "name", "id"):
+    # Clip ID / label — avoid overlapping with clip_type or subject columns
+    occupied = {col_idx.get("subject"), col_idx.get("clip_type")} - {None}
+    for kw in ("clip", "video", "label", "name"):
         for i, h in enumerate(h_lower):
-            if kw in h and "clip_id" not in col_idx and i != col_idx.get("subject"):
+            if kw in h and "clip_id" not in col_idx and i not in occupied:
                 col_idx["clip_id"] = i
                 break
 
@@ -172,6 +206,30 @@ def _map_columns(headers: list[str]) -> dict:
     return col_idx
 
 
+def _extract_subject_from_clip_id(clip_id_str: str) -> tuple[str, str]:
+    """
+    Extract subject ID and type suffix from a composite clip ID.
+
+    PEMF uses codes like 'S001A', 'S002L', 'S068P':
+      subject = S001, suffix = A (Algometer)
+
+    Returns (subject_id, suffix_letter_or_empty).
+    """
+    s = clip_id_str.strip()
+    if not s:
+        return s, ""
+    # Pattern: S###<suffix> or just a number
+    if s[0].upper() == "S" and len(s) >= 4:
+        # Find where digits end
+        i = 1
+        while i < len(s) and s[i].isdigit():
+            i += 1
+        subject = s[:i]
+        suffix = s[i:].strip()
+        return subject, suffix
+    return s, ""
+
+
 def _parse_row(row: tuple, headers: list[str], col_idx: dict, row_idx: int) -> dict | None:
     """Parse a single Excel row into a clip record."""
     def get(key, default=None):
@@ -180,36 +238,46 @@ def _parse_row(row: tuple, headers: list[str], col_idx: dict, row_idx: int) -> d
             return default
         return row[idx]
 
-    subject_raw = get("subject")
-    if subject_raw is None:
-        return None
-
-    subject_id = f"S{int(float(str(subject_raw))):03d}" if str(subject_raw).replace(".", "").isdigit() else str(subject_raw).strip()
-
-    clip_type_raw = get("clip_type", "")
-    clip_type = str(clip_type_raw).strip().lower() if clip_type_raw else ""
-
+    # --- Subject ID ---
+    # If a dedicated subject column exists, use it; otherwise extract from clip_id
     clip_id_raw = get("clip_id", row_idx)
     clip_id = str(clip_id_raw).strip() if clip_id_raw is not None else str(row_idx)
 
+    subject_raw = get("subject")
+    if subject_raw is not None:
+        s = str(subject_raw).strip()
+        subject_id = f"S{int(float(s)):03d}" if s.replace(".", "").isdigit() else s
+    else:
+        # Real PEMF: extract from composite clip ID (e.g. S001A → S001)
+        subject_id, clip_suffix = _extract_subject_from_clip_id(clip_id)
+        if not subject_id:
+            return None  # Cannot determine subject
+
+    # --- Clip type ---
+    clip_type_raw = get("clip_type", "")
+    clip_type = str(clip_type_raw).strip().lower() if clip_type_raw else ""
+
+    # If clip_type is empty, infer from composite clip ID suffix
+    if not clip_type and subject_raw is None:
+        _, suffix = _extract_subject_from_clip_id(clip_id)
+        clip_type = CLIP_SUFFIX_MAP.get(suffix.lower(), suffix.lower())
+
     is_neutral = any(kw in clip_type for kw in NEUTRAL_KEYWORDS)
 
-    # Pain rating
+    # --- Pain intensity ---
     pain_raw = get("pain_rating")
     if is_neutral:
         pain_score_raw = 0.0
     elif pain_raw is not None:
-        try:
-            pain_score_raw = float(pain_raw)
-        except (TypeError, ValueError):
-            pain_score_raw = None
+        # Handle European-formatted mean(SD) strings like "5,20 (2,516)"
+        pain_score_raw = parse_european_mean(pain_raw)
     else:
         pain_score_raw = None
 
     # PSPI-equivalent: Likert (0-8) × 2 = 0-16
     pain_score_pspi = round(pain_score_raw * 2.0, 2) if pain_score_raw is not None else (0.0 if is_neutral else None)
 
-    # AU binary presence
+    # --- AU intensities (0-6 in real PEMF, or binary 0/1, or "x" markers) ---
     aus = {}
     for au in PEMF_AU_COLUMNS:
         val = get(au)
@@ -217,7 +285,6 @@ def _parse_row(row: tuple, headers: list[str], col_idx: dict, row_idx: int) -> d
             try:
                 aus[au] = int(float(str(val))) if str(val).strip() not in ("", "x", "X") else 1
             except (ValueError, TypeError):
-                # "x" or "X" means present in some FACS notations
                 aus[au] = 1 if str(val).strip().lower() in ("x", "yes", "1") else 0
         else:
             aus[au] = 0
@@ -237,10 +304,11 @@ def find_clip_folder(pictures_dir: Path, clip_record: dict) -> Path | None:
     """
     Try to find the image folder for a clip record.
 
-    Tries several naming conventions:
-      - clip_id directly (e.g. "001", "clip_001")
-      - subject_type combo (e.g. "S001_neutral", "S001_co2")
-      - subject_id alone if only one type folder per subject
+    Tries several naming conventions in order:
+      1. clip_id directly (e.g. "S001A" for real PEMF)
+      2. subject_type combo (e.g. "S001_algometer")
+      3. Numeric zero-padded (e.g. "001")
+      4. Fuzzy match on subject + type keywords
     """
     clip_id = clip_record["clip_id"]
     subject_id = clip_record["subject_id"]
@@ -248,7 +316,7 @@ def find_clip_folder(pictures_dir: Path, clip_record: dict) -> Path | None:
 
     candidates = [
         clip_id,
-        f"{clip_id:>03}" if clip_id.isdigit() else clip_id,
+        f"{clip_id:>03}" if clip_id.isdigit() else None,
         f"{subject_id}_{clip_type}",
         f"{subject_id}_{clip_id}",
         f"{subject_id}-{clip_type}",
@@ -257,17 +325,27 @@ def find_clip_folder(pictures_dir: Path, clip_record: dict) -> Path | None:
     ]
 
     for name in candidates:
+        if name is None:
+            continue
         p = pictures_dir / name
         if p.is_dir() and any(p.iterdir()):
             return p
 
-    # Fuzzy: any subdir containing subject_id
-    for subdir in pictures_dir.iterdir():
+    # Fuzzy: any subdir containing the clip_id (case-insensitive)
+    clip_id_lower = clip_id.lower()
+    for subdir in sorted(pictures_dir.iterdir()):
         if not subdir.is_dir():
             continue
-        if subject_id.lower() in subdir.name.lower():
-            # If clip_type info is also in the name, prefer that
-            if clip_type and any(kw in subdir.name.lower() for kw in clip_type.split()):
+        if subdir.name.lower() == clip_id_lower:
+            return subdir
+
+    # Fuzzy: subdir containing subject_id + type keywords
+    for subdir in sorted(pictures_dir.iterdir()):
+        if not subdir.is_dir():
+            continue
+        name_lower = subdir.name.lower()
+        if subject_id.lower() in name_lower:
+            if clip_type and any(kw in name_lower for kw in clip_type.split()):
                 return subdir
 
     return None
