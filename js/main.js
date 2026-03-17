@@ -691,10 +691,24 @@
                 faceScore = result.facePain * (1 - cw) + lastCnnScore * cw;
             }
 
+            // Recompute total using CNN-blended face score instead of AU-only
+            // This ensures the CNN contribution flows into the aggregate score
+            let totalScore = faceScore;
+            if (result.hrPain !== null || result.bodyPain !== null) {
+                const activeWeights = { face: engine.faceWeight };
+                if (result.hrPain !== null && engine.hrWeight > 0) activeWeights.hr = engine.hrWeight;
+                if (result.bodyPain !== null && engine.bodyWeight > 0) activeWeights.body = engine.bodyWeight;
+                const totalW = activeWeights.face + (activeWeights.hr || 0) + (activeWeights.body || 0);
+                totalScore = faceScore * (activeWeights.face / totalW)
+                    + (result.hrPain || 0) * ((activeWeights.hr || 0) / totalW)
+                    + (result.bodyPain || 0) * ((activeWeights.body || 0) / totalW);
+            }
+            totalScore = Math.max(0, Math.min(10, Math.round(totalScore * 10) / 10));
+
             const frame = captureFrame();
             chart.addSample(
-                result.score,     // total aggregate
-                faceScore,        // combined face
+                totalScore,       // total aggregate (includes CNN via face blend)
+                faceScore,        // combined face (AU + CNN)
                 result.facePain,  // AU engine (rules-based)
                 result.bodyPain,  // body motion
                 result.hrPain,    // HR pain
@@ -915,7 +929,17 @@
         const physio = bleHR.isActive() ? { hr: bleHR.heartRate, hrv: bleHR.hrv } : null;
         const bodyScore = (bodyMotion.lastResult && poseReady) ? bodyMotion.lastResult.score : null;
         const result = engine.process(landmarks, physio, bodyScore);
-        gauge.setScore(result.score);
+        // Blend CNN into the displayed gauge score (same logic as chart total)
+        let gaugeScore = result.score;
+        if (lastCnnScore != null && result.facePain != null) {
+            const cw = settings.cnnWeight;
+            const blendedFace = result.facePain * (1 - cw) + lastCnnScore * cw;
+            // Replace AU-only face component with CNN-blended face in the total
+            // result.score already has smoothing applied to AU-only; adjust by the CNN delta
+            const cnnDelta = blendedFace - result.facePain;
+            gaugeScore = Math.max(0, Math.min(10, Math.round((result.score + cnnDelta) * 10) / 10));
+        }
+        gauge.setScore(gaugeScore);
         updateAUBars(result.aus);
         updateEngineScores(result);
         lastResult = result;
