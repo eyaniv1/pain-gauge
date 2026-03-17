@@ -30,6 +30,10 @@ class PainEngine {
         this.au43Sensitivity = options.au43Sensitivity ?? 8;
         this.talkingSuppression = options.talkingSuppression ?? 0.5;
 
+        // HR scoring sensitivity
+        this.hrElevationSensitivity = options.hrElevationSensitivity ?? 1.0;
+        this.hrvSuppressionSensitivity = options.hrvSuppressionSensitivity ?? 1.0;
+
         // Multimodal fusion parameters
         this.faceWeight = options.faceWeight ?? 0.5;  // Face contribution
         this.hrWeight = options.hrWeight ?? 0.3;      // HR contribution
@@ -201,14 +205,14 @@ class PainEngine {
         // HR component: elevation from estimated rest → 0-5 score
         // +30 bpm above rest = score 5 (max contribution)
         const hrElevation = Math.max(0, hr - estimatedRestHR);
-        const hrScore = Math.min(5, (hrElevation / 30) * 5);
+        const hrScore = Math.min(5, (hrElevation / 30) * 5 * this.hrElevationSensitivity);
 
         // HRV component: suppression from estimated rest → 0-5 score
         // 80% reduction = score 5 (max contribution)
         let hrvScore = 0;
         if (estimatedRestHRV > 5) {
             const hrvDrop = Math.max(0, estimatedRestHRV - hrv) / estimatedRestHRV;
-            hrvScore = Math.min(5, (hrvDrop / 0.8) * 5);
+            hrvScore = Math.min(5, (hrvDrop / 0.8) * 5 * this.hrvSuppressionSensitivity);
         }
 
         // Combined: 0-10 scale (equal weight HR and HRV)
