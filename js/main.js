@@ -65,6 +65,7 @@
     let currentSessionId = null;
     let sampleBuffer = []; // accumulated samples to send in batches
     let sampleFlushInterval = null;
+    let lastCnnScore = null; // latest CNN engine score from backend
 
     // ── Screens ───────────────────────────────────────────────────
 
@@ -622,6 +623,7 @@
             await PainGaugeAPI.endSession(currentSessionId, {});
             currentSessionId = null;
         }
+        lastCnnScore = null;
 
         switchView(1);
         loadHistorySessions();
@@ -636,6 +638,7 @@
         if (result && result.ai_results) {
             for (const ai of result.ai_results) {
                 chart.addAiSample(ai.timestamp_ms / 1000, ai.ai_score);
+                lastCnnScore = ai.ai_score;
             }
         }
     }
@@ -867,6 +870,7 @@
         const result = engine.process(landmarks, physio, bodyScore);
         gauge.setScore(result.score);
         updateAUBars(result.aus);
+        updateEngineScores(result);
         lastResult = result;
         if (bleHR.simulating) bleHR.setSimPainLevel(result.facePain);
         // Update HR pain display
@@ -914,6 +918,26 @@
             elements.bar.style.width = `${pct}%`;
             elements.bar.style.backgroundColor = PainGauge.painColor(value * 2);
             elements.value.textContent = value.toFixed(1);
+        }
+    }
+
+    // ── Update engine score summary ────────────────────────────────
+
+    const auEngineScoreEl = document.getElementById('au-engine-score');
+    const cnnEngineScoreEl = document.getElementById('cnn-engine-score');
+    const faceCombinedScoreEl = document.getElementById('face-combined-score');
+
+    function updateEngineScores(result) {
+        // AU engine = the rules-based face pain score
+        auEngineScoreEl.textContent = result.facePain != null ? result.facePain.toFixed(1) : '--';
+        // CNN engine = latest score from backend (async)
+        cnnEngineScoreEl.textContent = lastCnnScore != null ? lastCnnScore.toFixed(1) : '--';
+        // Combined face score: blend AU and CNN when both available
+        if (lastCnnScore != null && result.facePain != null) {
+            const combined = (result.facePain + lastCnnScore) / 2;
+            faceCombinedScoreEl.textContent = combined.toFixed(1);
+        } else {
+            faceCombinedScoreEl.textContent = result.facePain != null ? result.facePain.toFixed(1) : '--';
         }
     }
 
