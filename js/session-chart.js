@@ -554,13 +554,10 @@ class SessionChart {
             // Hit area
             this._legendHitAreas.push({ key, x: legendX - 2, y: legendY - 2, w: itemW + 4, h: itemH + 4 });
 
-            const alpha = series.visible ? 1 : 0.35;
-            ctx.globalAlpha = alpha;
-
             // Checkbox
             const cbX = legendX;
             const cbY = legendY + 2;
-            ctx.strokeStyle = series.visible ? series.color : '#aaa';
+            ctx.strokeStyle = series.color;
             ctx.lineWidth = 1.5;
             ctx.setLineDash([]);
             ctx.strokeRect(cbX, cbY, checkSize, checkSize);
@@ -588,12 +585,10 @@ class SessionChart {
             ctx.setLineDash([]);
 
             // Label
-            ctx.fillStyle = series.visible ? '#333' : '#aaa';
+            ctx.fillStyle = '#333';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
             ctx.fillText(series.label, swatchStartX + 22, legendY);
-
-            ctx.globalAlpha = 1;
             legendX += itemW + 10;
         }
     }
