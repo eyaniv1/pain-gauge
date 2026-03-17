@@ -1,13 +1,15 @@
 {
-    "version": "pain-unbc-v2",
+    "version": "pain-pemf-v1",
     "format": "onnx",
-    "description": "Pain detection model trained on UNBC-McMaster Shoulder Pain Expression Archive. Comparative model: takes target face + reference face, outputs PSPI via feature subtraction.",
-    "trained_on": "UNBC-McMaster (subjects 66, 80, 97, 108, 121 excluded from training)",
-    "source": "TaatiTeam/pain_detection_demo (converted from PyTorch, base comparative model)",
+    "description": "Pain detection model trained on PEMF (Pain E-Motion Faces Database). Comparative model: takes target face + reference face, outputs pain score via feature subtraction. Warm-started from TaatiTeam UNBC checkpoint.",
+    "trained_on": "PEMF (68 subjects, 5320 frames, algometer + laser + posed + neutral pain types)",
+    "source": "Algoscope custom training (warm-start from TaatiTeam/pain_detection_demo epoch 13)",
     "input": "1x2x160x160 grayscale (channel 0=target, channel 1=reference)",
-    "output": "40 regression values. Last 3 are PSPI for [Dementia, Healthy, UNBC]. Use index -1 for UNBC PSPI (0-16 scale).",
+    "output": "Single sigmoid value (0-1). Maps to 0-10 pain scale.",
     "comparative": true,
-    "pspi_index": -1,
-    "pspi_max": 16,
-    "notes": "Reference frame provided by calibration (patient's face at known pain level). Falls back to zero reference when uncalibrated."
+    "pspi_index": 0,
+    "pspi_max": 1,
+    "val_mae": 1.426,
+    "val_rmse": 1.666,
+    "notes": "Reference frame provided by calibration (patient's face at known pain level). Falls back to zero reference when uncalibrated. License: UHN non-commercial research (inherited from warm-start weights)."
 }

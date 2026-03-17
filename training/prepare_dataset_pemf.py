@@ -87,6 +87,10 @@ def find_pictures_dir(dataset_root: Path, pictures_dir: str | None = None) -> Pa
     for name in ("Pictures", "pictures", "Images", "images", "Frames", "frames", "Stills", "stills"):
         candidate = dataset_root / name
         if candidate.is_dir():
+            # Prefer Pictures/Original/ if it exists (real PEMF structure)
+            original = candidate / "Original"
+            if original.is_dir():
+                return original
             return candidate
     return None
 
@@ -304,16 +308,47 @@ def find_clip_folder(pictures_dir: Path, clip_record: dict) -> Path | None:
     """
     Try to find the image folder for a clip record.
 
-    Tries several naming conventions in order:
-      1. clip_id directly (e.g. "S001A" for real PEMF)
-      2. subject_type combo (e.g. "S001_algometer")
-      3. Numeric zero-padded (e.g. "001")
-      4. Fuzzy match on subject + type keywords
+    Supports two layouts:
+      A) Hierarchical (real PEMF): {pictures_dir}/{subject}/{kind_folder}/
+         e.g. Pictures/Original/S001/Algometer Pain/
+      B) Flat: {pictures_dir}/{clip_id}/ or similar
+
+    Kind folder mapping for layout A:
+      algometer → "Algometer Pain"
+      laser     → "Laser Pain"
+      neutral   → "Neutral"
+      posed     → "Posed Pain"
     """
     clip_id = clip_record["clip_id"]
     subject_id = clip_record["subject_id"]
     clip_type = clip_record["clip_type"]
 
+    # --- Layout A: hierarchical {subject}/{kind}/ ---
+    KIND_FOLDER_MAP = {
+        "algometer": "Algometer Pain",
+        "laser": "Laser Pain",
+        "neutral": "Neutral",
+        "posed": "Posed Pain",
+    }
+
+    subject_dir = pictures_dir / subject_id
+    if subject_dir.is_dir():
+        # Try exact kind folder mapping
+        kind_folder = KIND_FOLDER_MAP.get(clip_type)
+        if kind_folder:
+            candidate = subject_dir / kind_folder
+            if candidate.is_dir() and any(candidate.iterdir()):
+                return candidate
+
+        # Fuzzy: any subfolder whose name contains the clip_type
+        if clip_type:
+            for subdir in sorted(subject_dir.iterdir()):
+                if not subdir.is_dir():
+                    continue
+                if clip_type in subdir.name.lower():
+                    return subdir
+
+    # --- Layout B: flat {clip_id}/ ---
     candidates = [
         clip_id,
         f"{clip_id:>03}" if clip_id.isdigit() else None,
