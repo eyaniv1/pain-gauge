@@ -23,7 +23,10 @@ const PainGaugeAPI = (function () {
         return connected;
     }
 
-    async function request(method, path, body) {
+    const MAX_RETRIES = 3;
+    const BASE_DELAY_MS = 1000;
+
+    async function request(method, path, body, attempt = 0) {
         if (!baseUrl) {
             connected = false;
             return null;
@@ -36,12 +39,26 @@ const PainGaugeAPI = (function () {
             if (body) opts.body = JSON.stringify(body);
             const res = await fetch(baseUrl + path, opts);
             if (!res.ok) {
+                // Retry on 429 (rate limit) or 529 (overloaded)
+                if ((res.status === 429 || res.status === 529) && attempt < MAX_RETRIES) {
+                    const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
+                    console.warn(`API ${method} ${path}: ${res.status}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+                    await new Promise(r => setTimeout(r, delay));
+                    return request(method, path, body, attempt + 1);
+                }
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.error || `HTTP ${res.status}`);
             }
             connected = true;
             return await res.json();
         } catch (e) {
+            // Retry on network errors (fetch failures)
+            if (!e.message.startsWith('HTTP') && attempt < MAX_RETRIES) {
+                const delay = BASE_DELAY_MS * Math.pow(2, attempt) + Math.random() * 500;
+                console.warn(`API ${method} ${path}: ${e.message}, retrying in ${Math.round(delay)}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+                await new Promise(r => setTimeout(r, delay));
+                return request(method, path, body, attempt + 1);
+            }
             if (e.message && !e.message.startsWith('HTTP')) {
                 connected = false;
             }
