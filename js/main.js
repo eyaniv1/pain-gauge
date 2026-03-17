@@ -22,6 +22,7 @@
         au43Threshold: 0.55,
         au43Sensitivity: 8,
         talkingSuppression: 0.5,
+        cnnWeight: 0.4,
         hrElevationSensitivity: 1.0,
         hrvSuppressionSensitivity: 1.0,
         faceWeight: 0.5,
@@ -123,6 +124,7 @@
         au43Threshold:      { input: 'set-au43-thresh', display: 'val-au43-thresh' },
         au43Sensitivity:    { input: 'set-au43-sens',   display: 'val-au43-sens' },
         talkingSuppression: { input: 'set-talk-supp',   display: 'val-talk-supp' },
+        cnnWeight:          { input: 'set-cnn-weight',  display: 'val-cnn-weight' },
         hrElevationSensitivity:   { input: 'set-hr-elev-sens',  display: 'val-hr-elev-sens' },
         hrvSuppressionSensitivity: { input: 'set-hrv-supp-sens', display: 'val-hrv-supp-sens' },
         faceWeight:         { input: 'set-face-weight',  display: 'val-face-weight' },
@@ -274,6 +276,8 @@
                     SAMPLE_INTERVAL_MS = val;
                 } else if (bodyMotionKeys.includes(key)) {
                     bodyMotion[key] = val;
+                } else if (key === 'cnnWeight') {
+                    // Used directly from settings in updateEngineScores
                 } else {
                     engine[key] = val;
                 }
@@ -932,9 +936,10 @@
         auEngineScoreEl.textContent = result.facePain != null ? result.facePain.toFixed(1) : '--';
         // CNN engine = latest score from backend (async)
         cnnEngineScoreEl.textContent = lastCnnScore != null ? lastCnnScore.toFixed(1) : '--';
-        // Combined face score: blend AU and CNN when both available
+        // Combined face score: weighted blend of AU and CNN
         if (lastCnnScore != null && result.facePain != null) {
-            const combined = (result.facePain + lastCnnScore) / 2;
+            const cw = settings.cnnWeight;
+            const combined = result.facePain * (1 - cw) + lastCnnScore * cw;
             faceCombinedScoreEl.textContent = combined.toFixed(1);
         } else {
             faceCombinedScoreEl.textContent = result.facePain != null ? result.facePain.toFixed(1) : '--';
