@@ -633,6 +633,67 @@ main {
 
 /* ── Heart Rate Panel ────────────────────────────────────── */
 
+/* ── Body Motion Panel ───────────────────────────────────── */
+
+.body-motion-panel {
+    width: 100%;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 18px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+}
+
+.body-motion-panel h3 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pose-status-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #eee;
+    color: #999;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.pose-status-badge.active {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.body-motion-score {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.body-score-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+}
+
+.body-score-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #333;
+    font-variant-numeric: tabular-nums;
+}
+
 .hr-panel {
     width: 100%;
     background: #fff;

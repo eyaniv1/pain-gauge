@@ -270,6 +270,36 @@
                     </div>
                 </div>
 
+                <div class="body-motion-panel" id="body-motion-panel">
+                    <h3>Body Motion <span class="pose-status-badge" id="pose-status-badge">Inactive</span></h3>
+                    <div class="body-motion-metrics">
+                        <div class="au-bar">
+                            <label>Guarding <span class="au-label">Protective</span></label>
+                            <div class="bar-track"><div class="bar-fill" id="guard-bar"></div></div>
+                            <span class="au-value" id="guard-value">0.0</span>
+                        </div>
+                        <div class="au-bar">
+                            <label>Bracing <span class="au-label">Rigidity</span></label>
+                            <div class="bar-track"><div class="bar-fill" id="brace-bar"></div></div>
+                            <span class="au-value" id="brace-value">0.0</span>
+                        </div>
+                        <div class="au-bar">
+                            <label>Restless <span class="au-label">Fidgeting</span></label>
+                            <div class="bar-track"><div class="bar-fill" id="restless-bar"></div></div>
+                            <span class="au-value" id="restless-value">0.0</span>
+                        </div>
+                        <div class="au-bar">
+                            <label>Freezing <span class="au-label">Avoidance</span></label>
+                            <div class="bar-track"><div class="bar-fill" id="freeze-bar"></div></div>
+                            <span class="au-value" id="freeze-value">0.0</span>
+                        </div>
+                    </div>
+                    <div class="body-motion-score">
+                        <span class="body-score-label">Body Pain Score</span>
+                        <span class="body-score-value" id="body-pain-score">--</span>
+                    </div>
+                </div>
+
                 <div class="hr-panel hidden" id="hr-panel">
                     <h3>Heart Rate Sensor</h3>
                     <div class="hr-device-info">
@@ -356,12 +386,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
     <!-- Application -->
     <script src="js/pain-engine.js?v=4"></script>
     <script src="js/gauge.js?v=4"></script>
     <script src="js/session-chart.js?v=4"></script>
     <script src="js/ble-heart-rate.js?v=1"></script>
+    <script src="js/body-motion.js?v=1"></script>
     <script src="js/api-client.js?v=4"></script>
     <script src="js/main.js?v=4"></script>
     <script>

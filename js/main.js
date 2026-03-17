@@ -144,6 +144,7 @@
     const gauge = new PainGauge('gauge');
     const chart = new SessionChart('session-chart');
     const bleHR = new BleHeartRate();
+    const bodyMotion = new BodyMotion();
 
     // ── Heart Rate Sensor UI ──────────────────────────────────
 
@@ -203,6 +204,21 @@
         hrSensorBtn.classList.toggle('active', isActive);
         if (isActive) hrPanel.classList.remove('hidden');
     };
+
+    // ── Body Motion Panel DOM refs ────────────────────────────
+    const bodyMotionPanel = document.getElementById('body-motion-panel');
+    const poseStatusBadge = document.getElementById('pose-status-badge');
+    const bodyPainScoreEl = document.getElementById('body-pain-score');
+    const bodyBars = {
+        guarding:     { bar: document.getElementById('guard-bar'),    value: document.getElementById('guard-value') },
+        bracing:      { bar: document.getElementById('brace-bar'),    value: document.getElementById('brace-value') },
+        restlessness: { bar: document.getElementById('restless-bar'), value: document.getElementById('restless-value') },
+        freezing:     { bar: document.getElementById('freeze-bar'),   value: document.getElementById('freeze-value') },
+    };
+
+    // Track latest pose results
+    let latestPoseLandmarks = null;
+    let poseActive = false;
 
     // ── Chart zoom controls ──────────────────────────────────────
     document.getElementById('chart-zoom-in').addEventListener('click', () => chart.zoomIn());
@@ -412,6 +428,7 @@
         isCalibrating = true;
         calibrationFrames = 0;
         engine.resetCalibration();
+        bodyMotion.resetCalibration();
         autoCalibFrames = AUTO_CALIB_COUNT;
         engine.baselinePainLevel = parseInt(baselinePainInput.value);
         calibrateBtn.disabled = true;
@@ -487,6 +504,7 @@
         calibStatus.textContent = inputMode === 'video' ? 'Video paused. Click Calibrate to begin.' : 'Camera ready. Click Calibrate when ready.';
         selectPainLevel(0);
         engine.resetCalibration();
+        bodyMotion.resetCalibration();
 
         // Clear AI calibration too
         if (PainGaugeAPI.isConnected()) {
@@ -647,6 +665,102 @@
 
     faceMesh.onResults(onResults);
 
+    // ── MediaPipe Pose setup ────────────────────────────────────
+
+    const pose = new Pose({
+        locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+        },
+    });
+
+    pose.setOptions({
+        modelComplexity: 1,       // 0=lite, 1=full, 2=heavy
+        smoothLandmarks: true,
+        minDetectionConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+    });
+
+    pose.onResults(onPoseResults);
+
+    function onPoseResults(results) {
+        if (results.poseLandmarks && results.poseLandmarks.length >= 33) {
+            latestPoseLandmarks = results.poseLandmarks;
+
+            if (!poseActive) {
+                poseActive = true;
+                poseStatusBadge.textContent = 'Active';
+                poseStatusBadge.classList.add('active');
+            }
+
+            // Calibrate body motion during face calibration
+            if (isCalibrating) {
+                bodyMotion.calibrate(latestPoseLandmarks);
+            }
+
+            // Process body motion
+            if (bodyMotion.isCalibrated() || bodyMotion._calibSamples.length === 0) {
+                const bodyResult = bodyMotion.process(latestPoseLandmarks);
+                updateBodyMotionUI(bodyResult);
+            }
+
+            // Draw pose skeleton on overlay
+            drawPoseSkeleton(results.poseLandmarks);
+        }
+    }
+
+    function updateBodyMotionUI(result) {
+        bodyPainScoreEl.textContent = result.score.toFixed(1);
+        for (const [key, elements] of Object.entries(bodyBars)) {
+            const value = result[key] || 0;
+            const pct = (value / 5) * 100;
+            elements.bar.style.width = `${pct}%`;
+            elements.bar.style.backgroundColor = PainGauge.painColor(value * 2);
+            elements.value.textContent = value.toFixed(1);
+        }
+    }
+
+    function drawPoseSkeleton(landmarks) {
+        const w = overlayEl.width;
+        const h = overlayEl.height;
+        if (!w || !h) return;
+
+        // Skeleton connections
+        const connections = [
+            [11, 12], // shoulders
+            [11, 13], [13, 15], // left arm
+            [12, 14], [14, 16], // right arm
+            [11, 23], [12, 24], // torso sides
+            [23, 24], // hips
+            [23, 25], [25, 27], // left leg
+            [24, 26], [26, 28], // right leg
+        ];
+
+        overlayCtx.strokeStyle = 'rgba(0, 220, 130, 0.5)';
+        overlayCtx.lineWidth = 2;
+
+        for (const [i, j] of connections) {
+            const a = landmarks[i];
+            const b = landmarks[j];
+            if ((a.visibility || 0) > 0.4 && (b.visibility || 0) > 0.4) {
+                overlayCtx.beginPath();
+                overlayCtx.moveTo(a.x * w, a.y * h);
+                overlayCtx.lineTo(b.x * w, b.y * h);
+                overlayCtx.stroke();
+            }
+        }
+
+        // Draw key joint dots
+        overlayCtx.fillStyle = 'rgba(0, 220, 130, 0.7)';
+        for (let i = 11; i <= 28; i++) {
+            const lm = landmarks[i];
+            if ((lm.visibility || 0) > 0.4) {
+                overlayCtx.beginPath();
+                overlayCtx.arc(lm.x * w, lm.y * h, 3, 0, 2 * Math.PI);
+                overlayCtx.fill();
+            }
+        }
+    }
+
     // ── Process each frame ────────────────────────────────────────
 
     function onResults(results) {
@@ -762,6 +876,7 @@
             cameraInstance = new Camera(videoEl, {
                 onFrame: async () => {
                     await faceMesh.send({ image: videoEl });
+                    pose.send({ image: videoEl });
                 },
                 facingMode: useFrontCamera ? 'user' : 'environment',
                 width: 640,
@@ -841,6 +956,7 @@
             if (inputMode !== 'video') return;
             if (!videoEl.paused && !videoEl.ended && videoEl.readyState >= 2) {
                 await faceMesh.send({ image: videoEl });
+                pose.send({ image: videoEl });
             }
             videoLoopId = requestAnimationFrame(loop);
         }
