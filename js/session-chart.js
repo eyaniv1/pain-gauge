@@ -126,7 +126,7 @@ class SessionChart {
         this.isRecording = false;
         this.startTime = null;
         this.stoppedElapsed = null;
-        this.chartTitle = title || 'Session Pain History';
+        this.chartTitle = title || 'Session Pain';
         this.selectedPoint = null;
 
         // Reset all data
@@ -459,7 +459,7 @@ class SessionChart {
         ctx.font = '14px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(this.chartTitle || 'Session Pain History', chartX, 8);
+        ctx.fillText(this.chartTitle || 'Session Pain', chartX, 8);
 
         // Interactive legend
         this._drawLegend(ctx, chartX, chartW, w);

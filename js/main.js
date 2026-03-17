@@ -1156,6 +1156,7 @@
     let historySessions = [];
     let historySelectedIds = new Set();
     let currentHistorySamples = [];
+    let lastCheckedIndex = -1; // for shift-click range selection
 
     historyRefreshBtn.addEventListener('click', () => loadHistorySessions());
 
@@ -1209,6 +1210,7 @@
         historySessionsTbody.innerHTML = '';
         historySelectedIds.clear();
         historySelectAll.checked = false;
+        lastCheckedIndex = -1;
         updateDeleteBtn();
 
         if (!PainGaugeAPI.isConnected() || !currentPatientId) {
@@ -1225,7 +1227,8 @@
         }
         historyEmpty.classList.add('hidden');
 
-        for (const s of historySessions) {
+        for (let idx = 0; idx < historySessions.length; idx++) {
+            const s = historySessions[idx];
             const tr = document.createElement('tr');
 
             const startDate = new Date(s.start_time);
@@ -1242,13 +1245,24 @@
                 <td><span class="session-link" data-id="${s.id}" style="font-size:11px">View</span></td>
             `;
 
-            // Checkbox handler
-            tr.querySelector('.session-check').addEventListener('change', (e) => {
-                if (e.target.checked) {
-                    historySelectedIds.add(s.id);
+            // Checkbox handler with shift-click range selection
+            const cb = tr.querySelector('.session-check');
+            cb.addEventListener('click', (e) => {
+                const checked = cb.checked;
+                if (e.shiftKey && lastCheckedIndex >= 0 && lastCheckedIndex !== idx) {
+                    const start = Math.min(lastCheckedIndex, idx);
+                    const end = Math.max(lastCheckedIndex, idx);
+                    const allCbs = historySessionsTbody.querySelectorAll('.session-check');
+                    for (let i = start; i <= end; i++) {
+                        allCbs[i].checked = checked;
+                        if (checked) historySelectedIds.add(historySessions[i].id);
+                        else historySelectedIds.delete(historySessions[i].id);
+                    }
                 } else {
-                    historySelectedIds.delete(s.id);
+                    if (checked) historySelectedIds.add(s.id);
+                    else historySelectedIds.delete(s.id);
                 }
+                lastCheckedIndex = idx;
                 historySelectAll.checked = historySelectedIds.size === historySessions.length;
                 updateDeleteBtn();
             });
