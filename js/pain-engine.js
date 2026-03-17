@@ -31,8 +31,9 @@ class PainEngine {
         this.talkingSuppression = options.talkingSuppression ?? 0.5;
 
         // Multimodal fusion parameters
-        this.hrWeight = options.hrWeight ?? 0.3;    // HR contribution
-        this.bodyWeight = options.bodyWeight ?? 0.2; // Body motion contribution
+        this.faceWeight = options.faceWeight ?? 0.5;  // Face contribution
+        this.hrWeight = options.hrWeight ?? 0.3;      // HR contribution
+        this.bodyWeight = options.bodyWeight ?? 0.2;   // Body motion contribution
         this.hrBaseline = null;  // { hr, hrv } captured during calibration
         this._hrCalibSamples = [];
     }
@@ -313,9 +314,7 @@ class PainEngine {
         }
 
         // Compute weighted fusion: normalize active weights proportionally
-        // Face base weight = remainder after HR + body (min 20%)
-        const faceBaseW = Math.max(0.2, 1 - this.hrWeight - this.bodyWeight);
-        const activeWeights = { face: faceBaseW };
+        const activeWeights = { face: this.faceWeight };
         if (hrPainScore !== null && this.hrWeight > 0) activeWeights.hr = this.hrWeight;
         if (bodyPainScore !== null && this.bodyWeight > 0) activeWeights.body = this.bodyWeight;
 

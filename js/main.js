@@ -22,8 +22,13 @@
         au43Threshold: 0.55,
         au43Sensitivity: 8,
         talkingSuppression: 0.5,
+        faceWeight: 0.5,
         hrWeight: 0.3,
         bodyWeight: 0.2,
+        guardingSensitivity: 1.0,
+        bracingSensitivity: 1.0,
+        restlessnessSensitivity: 1.0,
+        freezingSensitivity: 1.0,
         smoothingSize: 8,
         sampleIntervalMs: 500,
         backendUrl: '',
@@ -115,8 +120,13 @@
         au43Threshold:      { input: 'set-au43-thresh', display: 'val-au43-thresh' },
         au43Sensitivity:    { input: 'set-au43-sens',   display: 'val-au43-sens' },
         talkingSuppression: { input: 'set-talk-supp',   display: 'val-talk-supp' },
+        faceWeight:         { input: 'set-face-weight',  display: 'val-face-weight' },
         hrWeight:           { input: 'set-hr-weight',   display: 'val-hr-weight' },
         bodyWeight:         { input: 'set-body-weight', display: 'val-body-weight' },
+        guardingSensitivity:      { input: 'set-guard-sens',   display: 'val-guard-sens' },
+        bracingSensitivity:       { input: 'set-brace-sens',   display: 'val-brace-sens' },
+        restlessnessSensitivity:  { input: 'set-restless-sens', display: 'val-restless-sens' },
+        freezingSensitivity:      { input: 'set-freeze-sens',  display: 'val-freeze-sens' },
         smoothingSize:      { input: 'set-smooth-win',  display: 'val-smooth-win' },
         sampleIntervalMs:   { input: 'set-sample-int',  display: 'val-sample-int' },
     };
@@ -146,7 +156,7 @@
     const gauge = new PainGauge('gauge');
     const chart = new SessionChart('session-chart');
     const bleHR = new BleHeartRate();
-    const bodyMotion = new BodyMotion();
+    const bodyMotion = new BodyMotion(settings);
 
     // ── Heart Rate Sensor UI ──────────────────────────────────
 
@@ -250,10 +260,15 @@
                 valEl.textContent = val;
                 settings[key] = val;
 
+                const bodyMotionKeys = ['guardingSensitivity', 'bracingSensitivity',
+                    'restlessnessSensitivity', 'freezingSensitivity'];
+
                 if (key === 'smoothingSize') {
                     engine.smoothingSize = val;
                 } else if (key === 'sampleIntervalMs') {
                     SAMPLE_INTERVAL_MS = val;
+                } else if (bodyMotionKeys.includes(key)) {
+                    bodyMotion[key] = val;
                 } else {
                     engine[key] = val;
                 }
@@ -281,11 +296,15 @@
         const keepBackendUrl = settings.backendUrl;
         settings = { ...DEFAULTS, backendUrl: keepBackendUrl };
         applySettingsToUI(settings);
+        const bodyMotionKeys = ['guardingSensitivity', 'bracingSensitivity',
+            'restlessnessSensitivity', 'freezingSensitivity'];
         for (const key of Object.keys(DEFAULTS)) {
             if (key === 'sampleIntervalMs') {
                 SAMPLE_INTERVAL_MS = DEFAULTS[key];
             } else if (key === 'backendUrl') {
                 // keep current backend URL
+            } else if (bodyMotionKeys.includes(key)) {
+                bodyMotion[key] = DEFAULTS[key];
             } else {
                 engine[key] = DEFAULTS[key];
             }
