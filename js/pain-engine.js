@@ -312,25 +312,23 @@ class PainEngine {
             hrPainScore = this.computeHRPainScore(physio.hr, physio.hrv);
         }
 
-        // Compute weighted fusion: normalize weights for active modalities
-        const activeWeights = { face: 1 };
+        // Compute weighted fusion: normalize active weights proportionally
+        // Face base weight = remainder after HR + body (min 20%)
+        const faceBaseW = Math.max(0.2, 1 - this.hrWeight - this.bodyWeight);
+        const activeWeights = { face: faceBaseW };
         if (hrPainScore !== null && this.hrWeight > 0) activeWeights.hr = this.hrWeight;
         if (bodyPainScore !== null && this.bodyWeight > 0) activeWeights.body = this.bodyWeight;
 
-        // Face gets remaining weight after HR and body
-        const totalExtra = (activeWeights.hr || 0) + (activeWeights.body || 0);
-        if (totalExtra > 0) {
-            // Cap total extra at 0.8 so face always contributes at least 20%
-            const scale = totalExtra > 0.8 ? 0.8 / totalExtra : 1;
-            const hrW = (activeWeights.hr || 0) * scale;
-            const bodyW = (activeWeights.body || 0) * scale;
-            const faceW = 1 - hrW - bodyW;
+        // Normalize so weights sum to 1 — disabled modalities redistribute proportionally
+        const totalW = activeWeights.face + (activeWeights.hr || 0) + (activeWeights.body || 0);
+        const faceW = activeWeights.face / totalW;
+        const hrW = (activeWeights.hr || 0) / totalW;
+        const bodyW = (activeWeights.body || 0) / totalW;
 
-            rawPain = facePain * faceW
-                + (hrPainScore || 0) * hrW
-                + (bodyPainScore || 0) * bodyW;
-            rawPain = Math.max(0, Math.min(10, rawPain));
-        }
+        rawPain = facePain * faceW
+            + (hrPainScore || 0) * hrW
+            + (bodyPainScore || 0) * bodyW;
+        rawPain = Math.max(0, Math.min(10, rawPain));
 
         // Temporal smoothing (exponential moving average)
         this.smoothingWindow.push(rawPain);
