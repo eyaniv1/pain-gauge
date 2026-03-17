@@ -33,6 +33,7 @@ _calibration = {
     "reference_frame": None,   # Preprocessed grayscale array (1, 1, H, W)
     "pain_level": 0,           # Patient's reported pain at calibration (0-10)
     "calibrated": False,
+    "self_score": 0.0,         # Model output when ref vs ref (baseline offset)
 }
 
 
@@ -192,8 +193,20 @@ async def calibrate(req: CalibrateRequest):
     _calibration["pain_level"] = pain_level
     _calibration["calibrated"] = True
 
+    # Compute self-score: model output when reference is compared to itself.
+    # This is the model's baseline offset (not zero due to sigmoid/nonlinearities).
+    # During prediction, we subtract this to get the true pain delta.
+    self_score = 0.0
+    if manager.loaded and manager.is_comparative():
+        ref = result.image_array
+        self_input = np.concatenate([ref, ref], axis=1)  # (1, 2, H, W)
+        self_pred = manager.predict(self_input)
+        self_score = self_pred["score"]
+    _calibration["self_score"] = self_score
+
     print(f"Calibrated: reference frame stored at pain level {pain_level}, "
-          f"face_detected={result.face_found}, shape={result.image_array.shape}")
+          f"face_detected={result.face_found}, shape={result.image_array.shape}, "
+          f"self_score={self_score:.2f}")
 
     return CalibrateResponse(
         ok=True,
@@ -208,6 +221,7 @@ async def clear_calibration():
     _calibration["reference_frame"] = None
     _calibration["pain_level"] = 0
     _calibration["calibrated"] = False
+    _calibration["self_score"] = 0.0
     return {"ok": True}
 
 
@@ -251,25 +265,26 @@ async def predict(req: PredictRequest):
     prediction = manager.predict(image_array)
     raw_model_score = prediction["score"]
 
-    # For comparative models with calibration: anchor score to calibration pain level
-    # The model outputs a PSPI-based score (0-10). When calibrated, we interpret
-    # the model's output as a *change* from the calibration state.
-    # - If model score > calibration baseline score → pain increased
-    # - If model score < calibration baseline score → pain decreased
+    # For comparative models with calibration: anchor score to calibration pain level.
+    # The model compares target vs reference via feature subtraction. When the target
+    # looks identical to the reference, the model still outputs a nonzero "self_score"
+    # (due to sigmoid/FC nonlinearities). We subtract this offset to get the true delta,
+    # then anchor to the patient's reported pain at calibration time.
     if manager.is_comparative() and _calibration["calibrated"]:
-        # Get the model's score for the current frame vs reference
-        # The comparative model already subtracts features, so:
-        # - Score ~0 means current face looks like the reference (same pain level)
-        # - Higher score means more pain than reference
-        # We anchor this to the calibration pain level
         cal_pain = _calibration["pain_level"]
+        self_score = _calibration["self_score"]
         model_score = prediction["score"]
 
-        # model_score is on 0-10 scale from PSPI.
-        # When target == reference, model outputs ~0 (no difference).
-        # The model_score represents additional pain beyond the reference.
-        # Anchor: calibration_pain + model_delta
-        anchored = cal_pain + model_score
+        # delta = how much the model thinks pain changed from reference
+        delta = model_score - self_score
+        # Scale delta to remaining range (can't exceed 10 or go below 0)
+        if delta >= 0:
+            remaining = 10 - cal_pain
+            scaled_delta = delta * (remaining / max(10 - self_score, 0.1))
+        else:
+            scaled_delta = delta * (cal_pain / max(self_score, 0.1))
+
+        anchored = cal_pain + scaled_delta
         prediction["score"] = round(max(0, min(10, anchored)), 2)
 
     # Blend with AU data if provided
