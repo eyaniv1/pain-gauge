@@ -258,6 +258,27 @@
         backendUrlInput.value = s.backendUrl || '';
     }
 
+    const fusionWeightKeys = ['faceWeight', 'hrWeight', 'bodyWeight'];
+
+    function redistributeFusionWeights(changedKey, newVal) {
+        const otherKeys = fusionWeightKeys.filter(k => k !== changedKey);
+        const otherSum = otherKeys.reduce((s, k) => s + settings[k], 0);
+        const remaining = Math.max(0, 1 - newVal);
+
+        for (const k of otherKeys) {
+            // Distribute remaining proportionally; if others were all zero, split evenly
+            const proportion = otherSum > 0 ? settings[k] / otherSum : 1 / otherKeys.length;
+            const adjusted = Math.round(remaining * proportion * 100) / 100;
+            settings[k] = adjusted;
+            engine[k] = adjusted;
+
+            // Update slider and display
+            const { input, display } = settingInputs[k];
+            document.getElementById(input).value = adjusted;
+            document.getElementById(display).textContent = adjusted;
+        }
+    }
+
     function bindSettingInputs() {
         for (const [key, { input, display }] of Object.entries(settingInputs)) {
             const el = document.getElementById(input);
@@ -270,7 +291,10 @@
                 const bodyMotionKeys = ['guardingSensitivity', 'bracingSensitivity',
                     'restlessnessSensitivity', 'freezingSensitivity'];
 
-                if (key === 'smoothingSize') {
+                if (fusionWeightKeys.includes(key)) {
+                    engine[key] = val;
+                    redistributeFusionWeights(key, val);
+                } else if (key === 'smoothingSize') {
                     engine.smoothingSize = val;
                 } else if (key === 'sampleIntervalMs') {
                     SAMPLE_INTERVAL_MS = val;
