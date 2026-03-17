@@ -162,6 +162,19 @@
     const engine = new PainEngine(settings);
     const gauge = new PainGauge('gauge');
     const chart = new SessionChart('session-chart');
+
+    // Wire up chart point click → frame viewer
+    chart.onPointSelected = (info) => {
+        const frameModal = document.getElementById('frame-modal');
+        const frameModalImg = document.getElementById('frame-modal-img');
+        const frameModalTitle = document.getElementById('frame-modal-title');
+        if (info && info.frame) {
+            frameModalImg.src = info.frame;
+            frameModalTitle.textContent = `${info.label}: ${info.score.toFixed(1)} @ ${Math.floor(info.time / 60)}:${Math.floor(info.time % 60).toString().padStart(2, '0')}`;
+            frameModal.classList.remove('hidden');
+        }
+    };
+
     const bleHR = new BleHeartRate();
     const bodyMotion = new BodyMotion(settings);
 
@@ -671,7 +684,22 @@
         if (!sessionActive) return;
         const now = performance.now();
         if (now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
-            chart.addSample(result.score);
+            // Compute combined face score (AU + CNN blend)
+            let faceScore = result.facePain;
+            if (lastCnnScore != null && result.facePain != null) {
+                const cw = settings.cnnWeight;
+                faceScore = result.facePain * (1 - cw) + lastCnnScore * cw;
+            }
+
+            const frame = captureFrame();
+            chart.addSample(
+                result.score,     // total aggregate
+                faceScore,        // combined face
+                result.facePain,  // AU engine (rules-based)
+                result.bodyPain,  // body motion
+                result.hrPain,    // HR pain
+                frame             // captured frame
+            );
             lastSampleTime = now;
 
             // Buffer sample for backend
@@ -690,7 +718,7 @@
                             rr: bleHR.rrIntervals.length > 0 ? bleHR.rrIntervals[bleHR.rrIntervals.length - 1] : null,
                         } : undefined,
                     },
-                    frame: captureFrame(),
+                    frame,
                 };
                 sampleBuffer.push(sample);
             }
@@ -896,10 +924,6 @@
         const hrPainEl = document.getElementById('hr-pain');
         if (hrPainEl) {
             hrPainEl.textContent = result.hrPain !== null ? result.hrPain.toFixed(1) : '--';
-        }
-        // Record body pain to chart
-        if (bodyScore !== null) {
-            chart.addBodySample(bodyScore);
         }
         maybeRecordSample(result);
     }

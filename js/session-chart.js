@@ -2,8 +2,7 @@
  * Session History Chart
  *
  * Canvas-based line chart that records and displays pain scores over time.
- * Supports dual lines: PSPI (blue) and AI score (red) with legend.
- * Recording starts after calibration and runs until stopped.
+ * Supports multiple lines with clickable legend toggling and point inspection.
  */
 
 class SessionChart {
@@ -11,41 +10,58 @@ class SessionChart {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
 
-        // Data
-        this.samples = [];       // { time: seconds, score: 0-10 }
-        this.aiSamples = [];     // { time: seconds, score: 0-10 } — AI scores
-        this.hrSamples = [];     // { time: seconds, bpm: number }
-        this.bodySamples = [];   // { time: seconds, score: 0-10 }
+        // Data series
+        this.series = {
+            total:  { data: [], label: 'Total',     color: '#1a1a2e', dash: [],     lineWidth: 3,   visible: true },
+            face:   { data: [], label: 'Face',       color: '#8e44ad', dash: [],     lineWidth: 2,   visible: false },
+            au:     { data: [], label: 'AU Engine',  color: '#2980b9', dash: [5, 4], lineWidth: 1.5, visible: false },
+            cnn:    { data: [], label: 'CNN',        color: '#c0392b', dash: [5, 4], lineWidth: 1.5, visible: false },
+            body:   { data: [], label: 'Body',       color: '#27ae60', dash: [],     lineWidth: 2,   visible: false },
+            hr:     { data: [], label: 'HR Pain',    color: '#e67e22', dash: [],     lineWidth: 2,   visible: false },
+        };
+        // HR BPM uses secondary Y-axis, tracked separately
+        this.hrBpmSamples = [];
+
+        // Frames for point inspection
+        this.frameSamples = []; // { time, frame (dataURL) }
+
         this.isRecording = false;
         this.startTime = null;
-        this.maxVisibleSeconds = 120; // 2 minutes visible window, scrolls
+        this.maxVisibleSeconds = 120;
 
         // Layout
         this.padding = { top: 30, right: 50, bottom: 40, left: 50 };
 
-        // Colors
-        this.pspiColor = '#2980b9';   // blue for PSPI
-        this.aiColor = 'rgba(192, 57, 43, 0.5)';  // dimmer red for AI
-        this.hrColor = '#e74c3c';     // red for heart rate
-        this.bodyColor = '#27ae60';   // green for body motion
-
         // Zoom
-        this.zoomLevels = [30, 60, 120, 300, 600]; // seconds
-        this.zoomIndex = 2; // default 120s
+        this.zoomLevels = [30, 60, 120, 300, 600];
+        this.zoomIndex = 2;
         this.maxVisibleSeconds = this.zoomLevels[this.zoomIndex];
+
+        // Legend interaction
+        this._legendHitAreas = []; // { key, x, y, w, h }
+
+        // Point inspection
+        this.selectedPoint = null; // { seriesKey, index, x, y, time, score }
+        this.onPointSelected = null; // callback({ time, score, frame })
+
+        // Click handler
+        this.canvas.addEventListener('click', (e) => this._handleClick(e));
 
         // Animation
         this._animFrame = null;
         this._startRender();
     }
 
+    // ── Recording lifecycle ─────────────────────────────────────
+
     startRecording() {
-        this.samples = [];
-        this.aiSamples = [];
-        this.hrSamples = [];
-        this.bodySamples = [];
+        for (const s of Object.values(this.series)) s.data = [];
+        this.hrBpmSamples = [];
+        this.frameSamples = [];
         this.startTime = performance.now();
         this.isRecording = true;
+        this.selectedPoint = null;
+        this._resetVisibility();
     }
 
     stopRecording() {
@@ -54,58 +70,79 @@ class SessionChart {
     }
 
     resetRecording() {
-        this.samples = [];
-        this.aiSamples = [];
-        this.hrSamples = [];
-        this.bodySamples = [];
+        for (const s of Object.values(this.series)) s.data = [];
+        this.hrBpmSamples = [];
+        this.frameSamples = [];
         this.startTime = null;
         this.stoppedElapsed = null;
         this.isRecording = false;
         this.chartTitle = null;
+        this.selectedPoint = null;
+        this._resetVisibility();
     }
 
-    addSample(score) {
+    _resetVisibility() {
+        for (const [key, s] of Object.entries(this.series)) {
+            s.visible = (key === 'total');
+        }
+    }
+
+    // ── Data input ──────────────────────────────────────────────
+
+    addSample(totalScore, faceScore, auScore, bodyScore, hrPainScore, frame) {
         if (!this.isRecording || this.startTime === null) return;
-        const elapsed = (performance.now() - this.startTime) / 1000;
-        this.samples.push({ time: elapsed, score });
+        const time = (performance.now() - this.startTime) / 1000;
+
+        this.series.total.data.push({ time, score: totalScore });
+        if (faceScore != null) this.series.face.data.push({ time, score: faceScore });
+        if (auScore != null) this.series.au.data.push({ time, score: auScore });
+        if (bodyScore != null) this.series.body.data.push({ time, score: bodyScore });
+        if (hrPainScore != null) this.series.hr.data.push({ time, score: hrPainScore });
+
+        if (frame) this.frameSamples.push({ time, frame });
     }
 
-    addAiSample(time, score) {
-        this.aiSamples.push({ time, score });
+    addCnnSample(time, score) {
+        this.series.cnn.data.push({ time, score });
     }
 
-    addHrSample(bpm) {
+    addHrBpmSample(bpm) {
         if (!this.isRecording || this.startTime === null) return;
-        const elapsed = (performance.now() - this.startTime) / 1000;
-        this.hrSamples.push({ time: elapsed, bpm });
+        const time = (performance.now() - this.startTime) / 1000;
+        this.hrBpmSamples.push({ time, bpm });
     }
 
-    addBodySample(score) {
-        if (!this.isRecording || this.startTime === null) return;
-        const elapsed = (performance.now() - this.startTime) / 1000;
-        this.bodySamples.push({ time: elapsed, score });
-    }
+    // Legacy compatibility
+    addAiSample(time, score) { this.addCnnSample(time, score); }
+    addHrSample(bpm) { this.addHrBpmSample(bpm); }
+    addBodySample(_score) { /* now handled via addSample */ }
 
-    /** Load historical samples from backend (array of { timestamp_ms, score, ai_score }) */
+    /** Load historical samples from backend */
     loadSamples(samples, title) {
         this.isRecording = false;
         this.startTime = null;
         this.stoppedElapsed = null;
         this.chartTitle = title || 'Session Pain History';
-        this.samples = samples.map(s => ({
-            time: s.timestamp_ms / 1000,
-            score: s.score,
-        }));
-        // Extract AI samples (only where ai_score exists)
-        this.aiSamples = samples
-            .filter(s => s.ai_score != null)
-            .map(s => ({
-                time: s.timestamp_ms / 1000,
-                score: s.ai_score,
-            }));
-        if (this.samples.length > 0) {
-            this.stoppedElapsed = this.samples[this.samples.length - 1].time;
+        this.selectedPoint = null;
+
+        // Reset all data
+        for (const s of Object.values(this.series)) s.data = [];
+        this.hrBpmSamples = [];
+        this.frameSamples = [];
+
+        for (const s of samples) {
+            const time = s.timestamp_ms / 1000;
+            if (s.score != null) this.series.total.data.push({ time, score: s.score });
+            if (s.ai_score != null) this.series.cnn.data.push({ time, score: s.ai_score });
+            if (s.frame) this.frameSamples.push({ time, frame: s.frame });
         }
+
+        if (this.series.total.data.length > 0) {
+            this.stoppedElapsed = this.series.total.data[this.series.total.data.length - 1].time;
+        }
+
+        // Show total by default for loaded sessions
+        this._resetVisibility();
     }
 
     getElapsedTime() {
@@ -114,7 +151,90 @@ class SessionChart {
         return (performance.now() - this.startTime) / 1000;
     }
 
-    // ── Rendering ─────────────────────────────────────────────────
+    // ── Click handling ──────────────────────────────────────────
+
+    _handleClick(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        // Check legend hits first
+        for (const hit of this._legendHitAreas) {
+            if (mx >= hit.x && mx <= hit.x + hit.w && my >= hit.y && my <= hit.y + hit.h) {
+                this.series[hit.key].visible = !this.series[hit.key].visible;
+                return;
+            }
+        }
+
+        // Check data point proximity
+        const w = this._displayWidth || this.canvas.width;
+        const h = this._displayHeight || this.canvas.height;
+        const p = this.padding;
+        const chartX = p.left;
+        const chartY = p.top;
+        const chartW = w - p.left - p.right;
+        const chartH = h - p.top - p.bottom;
+
+        // Only check within chart area
+        if (mx < chartX || mx > chartX + chartW || my < chartY || my > chartY + chartH) {
+            this.selectedPoint = null;
+            return;
+        }
+
+        const elapsed = this.getElapsedTime();
+        const timeStart = elapsed > this.maxVisibleSeconds ? elapsed - this.maxVisibleSeconds : 0;
+        const timeEnd = Math.max(this.maxVisibleSeconds, elapsed);
+        const timeSpan = timeEnd - timeStart;
+
+        let closest = null;
+        let closestDist = 15; // max pixel distance to snap
+
+        for (const [key, series] of Object.entries(this.series)) {
+            if (!series.visible) continue;
+            for (let i = 0; i < series.data.length; i++) {
+                const s = series.data[i];
+                if (s.time < timeStart || s.time > timeEnd) continue;
+                const px = chartX + ((s.time - timeStart) / timeSpan) * chartW;
+                const py = chartY + chartH - (s.score / 10) * chartH;
+                const dist = Math.sqrt((mx - px) ** 2 + (my - py) ** 2);
+                if (dist < closestDist) {
+                    closestDist = dist;
+                    closest = { seriesKey: key, index: i, x: px, y: py, time: s.time, score: s.score };
+                }
+            }
+        }
+
+        this.selectedPoint = closest;
+
+        if (closest && this.onPointSelected) {
+            // Find nearest frame
+            const frame = this._findNearestFrame(closest.time);
+            this.onPointSelected({
+                time: closest.time,
+                score: closest.score,
+                seriesKey: closest.seriesKey,
+                label: this.series[closest.seriesKey].label,
+                frame,
+            });
+        } else if (!closest && this.onPointSelected) {
+            this.onPointSelected(null);
+        }
+    }
+
+    _findNearestFrame(time) {
+        if (this.frameSamples.length === 0) return null;
+        let best = this.frameSamples[0];
+        let bestDist = Math.abs(best.time - time);
+        for (const f of this.frameSamples) {
+            const d = Math.abs(f.time - time);
+            if (d < bestDist) { best = f; bestDist = d; }
+        }
+        // Only return if within 2 seconds
+        return bestDist < 2 ? best.frame : null;
+    }
+
+    // ── Rendering ───────────────────────────────────────────────
 
     _resizeCanvas() {
         const rect = this.canvas.getBoundingClientRect();
@@ -146,7 +266,6 @@ class SessionChart {
 
         ctx.clearRect(0, 0, w, h);
 
-        // Chart area
         const chartX = p.left;
         const chartY = p.top;
         const chartW = w - p.left - p.right;
@@ -156,7 +275,7 @@ class SessionChart {
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, w, h);
 
-        // Pain zone bands (horizontal)
+        // Pain zone bands
         const zones = [
             { from: 0, to: 2, color: 'rgba(255,255,255,0.8)' },
             { from: 2, to: 4, color: 'rgba(255,220,220,0.5)' },
@@ -164,7 +283,6 @@ class SessionChart {
             { from: 6, to: 8, color: 'rgba(255,120,120,0.4)' },
             { from: 8, to: 10, color: 'rgba(255,60,60,0.3)' },
         ];
-
         for (const zone of zones) {
             const y1 = chartY + chartH - (zone.to / 10) * chartH;
             const y2 = chartY + chartH - (zone.from / 10) * chartH;
@@ -176,6 +294,7 @@ class SessionChart {
         const elapsed = this.getElapsedTime();
         const timeStart = elapsed > this.maxVisibleSeconds ? elapsed - this.maxVisibleSeconds : 0;
         const timeEnd = Math.max(this.maxVisibleSeconds, elapsed);
+        const timeSpan = timeEnd - timeStart;
 
         // Grid lines & Y-axis labels
         ctx.strokeStyle = '#e0e0e0';
@@ -184,7 +303,6 @@ class SessionChart {
         ctx.font = '12px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
-
         for (let i = 0; i <= 10; i += 2) {
             const y = chartY + chartH - (i / 10) * chartH;
             ctx.beginPath();
@@ -197,9 +315,7 @@ class SessionChart {
         // X-axis time labels
         ctx.textAlign = 'center';
         ctx.textBaseline = 'top';
-        const timeSpan = timeEnd - timeStart;
         const timeStep = timeSpan <= 60 ? 10 : timeSpan <= 120 ? 15 : 30;
-
         for (let t = Math.ceil(timeStart / timeStep) * timeStep; t <= timeEnd; t += timeStep) {
             const x = chartX + ((t - timeStart) / timeSpan) * chartW;
             ctx.beginPath();
@@ -211,108 +327,62 @@ class SessionChart {
             ctx.fillText(this._formatTime(t), x, chartY + chartH + 6);
         }
 
-        // Plot PSPI data (blue)
-        const visibleSamples = this.samples.filter(s => s.time >= timeStart && s.time <= timeEnd);
-        const hasAI = this.aiSamples.length > 0;
-        const visibleAI = hasAI ? this.aiSamples.filter(s => s.time >= timeStart && s.time <= timeEnd) : [];
+        // Draw filled area under total score
+        if (this.series.total.visible) {
+            const vis = this.series.total.data.filter(s => s.time >= timeStart && s.time <= timeEnd);
+            if (vis.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(chartX + ((vis[0].time - timeStart) / timeSpan) * chartW, chartY + chartH);
+                for (const s of vis) {
+                    ctx.lineTo(
+                        chartX + ((s.time - timeStart) / timeSpan) * chartW,
+                        chartY + chartH - (s.score / 10) * chartH
+                    );
+                }
+                ctx.lineTo(chartX + ((vis[vis.length - 1].time - timeStart) / timeSpan) * chartW, chartY + chartH);
+                ctx.closePath();
+                const gradient = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
+                gradient.addColorStop(0, 'rgba(26, 26, 46, 0.15)');
+                gradient.addColorStop(1, 'rgba(26, 26, 46, 0.02)');
+                ctx.fillStyle = gradient;
+                ctx.fill();
+            }
+        }
 
-        if (visibleSamples.length > 1) {
-            // Filled area under PSPI curve
-            ctx.beginPath();
-            const firstX = chartX + ((visibleSamples[0].time - timeStart) / timeSpan) * chartW;
-            ctx.moveTo(firstX, chartY + chartH);
+        // Draw each visible series
+        const drawOrder = ['au', 'cnn', 'face', 'body', 'hr', 'total'];
+        for (const key of drawOrder) {
+            const series = this.series[key];
+            if (!series.visible || series.data.length < 2) continue;
+            const vis = series.data.filter(s => s.time >= timeStart && s.time <= timeEnd);
+            if (vis.length < 2) continue;
+            this._drawLine(ctx, vis, chartX, chartY, chartW, chartH, timeStart, timeSpan, series);
+        }
 
-            for (const s of visibleSamples) {
-                const x = chartX + ((s.time - timeStart) / timeSpan) * chartW;
-                const y = chartY + chartH - (s.score / 10) * chartH;
-                ctx.lineTo(x, y);
+        // HR BPM on secondary axis (only if hr pain line is visible)
+        const hasHRBpm = this.hrBpmSamples.length > 0;
+        if (hasHRBpm && this.series.hr.visible) {
+            const hrMin = 40, hrMax = 180;
+            const visHR = this.hrBpmSamples.filter(s => s.time >= timeStart && s.time <= timeEnd);
+            if (visHR.length > 1) {
+                ctx.beginPath();
+                for (let i = 0; i < visHR.length; i++) {
+                    const s = visHR[i];
+                    const x = chartX + ((s.time - timeStart) / timeSpan) * chartW;
+                    const y = chartY + chartH - ((s.bpm - hrMin) / (hrMax - hrMin)) * chartH;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.strokeStyle = 'rgba(230, 126, 34, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.lineJoin = 'round';
+                ctx.setLineDash([3, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
             }
 
-            const lastX = chartX + ((visibleSamples[visibleSamples.length - 1].time - timeStart) / timeSpan) * chartW;
-            ctx.lineTo(lastX, chartY + chartH);
-            ctx.closePath();
-
-            const gradient = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
-            gradient.addColorStop(0, 'rgba(41, 128, 185, 0.2)');
-            gradient.addColorStop(1, 'rgba(41, 128, 185, 0.02)');
-            ctx.fillStyle = gradient;
-            ctx.fill();
-
-            // PSPI Line
-            this._drawLine(ctx, visibleSamples, chartX, chartY, chartH, timeStart, timeSpan, this.pspiColor);
-        }
-
-        // Plot AI data (red) — only when we have AI samples
-        if (visibleAI.length > 1) {
-            // Filled area under AI curve
-            ctx.beginPath();
-            const firstAIX = chartX + ((visibleAI[0].time - timeStart) / timeSpan) * chartW;
-            ctx.moveTo(firstAIX, chartY + chartH);
-
-            for (const s of visibleAI) {
-                const x = chartX + ((s.time - timeStart) / timeSpan) * chartW;
-                const y = chartY + chartH - (s.score / 10) * chartH;
-                ctx.lineTo(x, y);
-            }
-
-            const lastAIX = chartX + ((visibleAI[visibleAI.length - 1].time - timeStart) / timeSpan) * chartW;
-            ctx.lineTo(lastAIX, chartY + chartH);
-            ctx.closePath();
-
-            const aiGradient = ctx.createLinearGradient(0, chartY, 0, chartY + chartH);
-            aiGradient.addColorStop(0, 'rgba(192, 57, 43, 0.08)');
-            aiGradient.addColorStop(1, 'rgba(192, 57, 43, 0.01)');
-            ctx.fillStyle = aiGradient;
-            ctx.fill();
-
-            // AI Line
-            this._drawLine(ctx, visibleAI, chartX, chartY, chartH, timeStart, timeSpan, this.aiColor);
-        }
-
-        // Plot Body Motion data (green, same Y-axis as pain 0-10)
-        const hasBody = this.bodySamples.length > 0;
-        const visibleBody = hasBody ? this.bodySamples.filter(s => s.time >= timeStart && s.time <= timeEnd) : [];
-
-        if (visibleBody.length > 1) {
-            this._drawLine(ctx, visibleBody, chartX, chartY, chartH, timeStart, timeSpan, this.bodyColor);
-        }
-
-        // Plot HR data (red, secondary Y-axis: 40-180 bpm)
-        const hasHR = this.hrSamples.length > 0;
-        const visibleHR = hasHR ? this.hrSamples.filter(s => s.time >= timeStart && s.time <= timeEnd) : [];
-        const hrMin = 40, hrMax = 180;
-
-        if (visibleHR.length > 1) {
-            ctx.beginPath();
-            for (let i = 0; i < visibleHR.length; i++) {
-                const s = visibleHR[i];
-                const x = chartX + ((s.time - timeStart) / timeSpan) * chartW;
-                const y = chartY + chartH - ((s.bpm - hrMin) / (hrMax - hrMin)) * chartH;
-                if (i === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            }
-            ctx.strokeStyle = this.hrColor;
-            ctx.lineWidth = 1.5;
-            ctx.lineJoin = 'round';
-            ctx.setLineDash([4, 3]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            // Current HR dot
-            const lastHR = visibleHR[visibleHR.length - 1];
-            const dotX = chartX + ((lastHR.time - timeStart) / timeSpan) * chartW;
-            const dotY = chartY + chartH - ((lastHR.bpm - hrMin) / (hrMax - hrMin)) * chartH;
-            ctx.beginPath();
-            ctx.arc(dotX, dotY, 3, 0, 2 * Math.PI);
-            ctx.fillStyle = this.hrColor;
-            ctx.fill();
-        }
-
-        // Right Y-axis for HR (when HR data present)
-        if (hasHR) {
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = 1;
-            ctx.fillStyle = this.hrColor;
+            // Right Y-axis labels for BPM
+            ctx.fillStyle = 'rgba(230, 126, 34, 0.5)';
             ctx.font = '10px "Segoe UI", Arial, sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
@@ -320,20 +390,64 @@ class SessionChart {
                 const y = chartY + chartH - ((bpm - hrMin) / (hrMax - hrMin)) * chartH;
                 ctx.fillText(bpm.toString(), chartX + chartW + 6, y);
             }
-            // Right Y-axis label
             ctx.save();
             ctx.translate(w - 4, chartY + chartH / 2);
             ctx.rotate(Math.PI / 2);
-            ctx.fillStyle = this.hrColor;
+            ctx.fillStyle = 'rgba(230, 126, 34, 0.5)';
             ctx.font = '10px "Segoe UI", Arial, sans-serif';
             ctx.textAlign = 'center';
             ctx.fillText('BPM', 0, 0);
             ctx.restore();
         }
 
+        // Selected point highlight
+        if (this.selectedPoint) {
+            const sp = this.selectedPoint;
+            const series = this.series[sp.seriesKey];
+            if (series && sp.index < series.data.length) {
+                const s = series.data[sp.index];
+                const px = chartX + ((s.time - timeStart) / timeSpan) * chartW;
+                const py = chartY + chartH - (s.score / 10) * chartH;
+
+                // Vertical crosshair
+                ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(px, chartY);
+                ctx.lineTo(px, chartY + chartH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Larger highlighted dot
+                ctx.beginPath();
+                ctx.arc(px, py, 7, 0, 2 * Math.PI);
+                ctx.fillStyle = series.color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                // Value tooltip
+                const tooltipText = `${series.label}: ${s.score.toFixed(1)} @ ${this._formatTime(s.time)}`;
+                ctx.font = 'bold 11px "Segoe UI", Arial, sans-serif';
+                const tw = ctx.measureText(tooltipText).width + 12;
+                const tx = Math.min(px - tw / 2, chartX + chartW - tw);
+                const ty = py - 28;
+                ctx.fillStyle = 'rgba(0,0,0,0.8)';
+                this._roundRect(ctx, Math.max(chartX, tx), ty, tw, 20, 4);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(tooltipText, Math.max(chartX + tw / 2, tx + tw / 2), ty + 10);
+            }
+        }
+
         // Chart border
         ctx.strokeStyle = '#ccc';
         ctx.lineWidth = 1;
+        ctx.setLineDash([]);
         ctx.strokeRect(chartX, chartY, chartW, chartH);
 
         // Title
@@ -343,101 +457,11 @@ class SessionChart {
         ctx.textBaseline = 'top';
         ctx.fillText(this.chartTitle || 'Session Pain History', chartX, 8);
 
-        // Legend
-        const hasLegend = hasAI || hasHR || hasBody;
-        if (hasLegend) {
-            const legendItems = 1 + (hasAI ? 1 : 0) + (hasBody ? 1 : 0) + (hasHR ? 1 : 0);
-            let legendX = chartX + chartW - legendItems * 60;
-            const legendY = 6;
-            ctx.font = '11px "Segoe UI", Arial, sans-serif';
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'top';
+        // Interactive legend
+        this._drawLegend(ctx, chartX, chartW, w);
 
-            // PSPI legend
-            ctx.strokeStyle = this.pspiColor;
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(legendX, legendY + 6);
-            ctx.lineTo(legendX + 20, legendY + 6);
-            ctx.stroke();
-            ctx.fillStyle = '#555';
-            ctx.fillText('PSPI', legendX + 24, legendY);
-            legendX += 65;
-
-            if (hasAI) {
-                // AI legend
-                ctx.strokeStyle = this.aiColor;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(legendX, legendY + 6);
-                ctx.lineTo(legendX + 20, legendY + 6);
-                ctx.stroke();
-                ctx.fillStyle = '#555';
-                ctx.fillText('AI', legendX + 24, legendY);
-                legendX += 50;
-            }
-
-            if (hasBody) {
-                // Body legend
-                ctx.strokeStyle = this.bodyColor;
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(legendX, legendY + 6);
-                ctx.lineTo(legendX + 20, legendY + 6);
-                ctx.stroke();
-                ctx.fillStyle = '#555';
-                ctx.fillText('Body', legendX + 24, legendY);
-                legendX += 60;
-            }
-
-            if (hasHR) {
-                // HR legend (dashed)
-                ctx.strokeStyle = this.hrColor;
-                ctx.lineWidth = 1.5;
-                ctx.setLineDash([4, 3]);
-                ctx.beginPath();
-                ctx.moveTo(legendX, legendY + 6);
-                ctx.lineTo(legendX + 20, legendY + 6);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.fillStyle = '#555';
-                ctx.fillText('HR', legendX + 24, legendY);
-            }
-        }
-
-        // Stats
-        if (this.samples.length > 0) {
-            const scores = this.samples.map(s => s.score);
-            const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-            const max = Math.max(...scores);
-            let statsText = `PSPI Avg: ${avg.toFixed(1)}  Peak: ${max.toFixed(1)}`;
-
-            if (this.aiSamples.length > 0) {
-                const aiScores = this.aiSamples.map(s => s.score);
-                const aiAvg = aiScores.reduce((a, b) => a + b, 0) / aiScores.length;
-                const aiMax = Math.max(...aiScores);
-                statsText += `  |  AI Avg: ${aiAvg.toFixed(1)}  Peak: ${aiMax.toFixed(1)}`;
-            }
-
-            if (hasBody) {
-                const bodyScores = this.bodySamples.map(s => s.score);
-                const bodyAvg = bodyScores.reduce((a, b) => a + b, 0) / bodyScores.length;
-                statsText += `  |  Body Avg: ${bodyAvg.toFixed(1)}`;
-            }
-
-            if (hasHR) {
-                const hrBpms = this.hrSamples.map(s => s.bpm);
-                const hrAvg = hrBpms.reduce((a, b) => a + b, 0) / hrBpms.length;
-                statsText += `  |  HR Avg: ${Math.round(hrAvg)}`;
-            }
-
-            statsText += `  |  ${this._formatTime(elapsed)}`;
-
-            ctx.textAlign = 'right';
-            ctx.fillStyle = '#888';
-            ctx.font = '11px "Segoe UI", Arial, sans-serif';
-            ctx.fillText(statsText, chartX + chartW, chartY + chartH + 24);
-        }
+        // Stats bar
+        this._drawStats(ctx, chartX, chartY, chartW, chartH, elapsed);
 
         // Y-axis label
         ctx.save();
@@ -450,7 +474,7 @@ class SessionChart {
         ctx.restore();
 
         // No data message
-        if (this.samples.length === 0) {
+        if (this.series.total.data.length === 0) {
             ctx.fillStyle = '#aaa';
             ctx.font = '16px "Segoe UI", Arial, sans-serif';
             ctx.textAlign = 'center';
@@ -463,8 +487,7 @@ class SessionChart {
         }
     }
 
-    _drawLine(ctx, data, chartX, chartY, chartH, timeStart, timeSpan, color) {
-        const chartW = this._displayWidth - this.padding.left - this.padding.right;
+    _drawLine(ctx, data, chartX, chartY, chartW, chartH, timeStart, timeSpan, series) {
         ctx.beginPath();
         for (let i = 0; i < data.length; i++) {
             const s = data[i];
@@ -473,10 +496,12 @@ class SessionChart {
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
         }
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = series.color;
+        ctx.lineWidth = series.lineWidth;
         ctx.lineJoin = 'round';
+        ctx.setLineDash(series.dash);
         ctx.stroke();
+        ctx.setLineDash([]);
 
         // Current value dot
         const last = data[data.length - 1];
@@ -484,12 +509,89 @@ class SessionChart {
         const dotY = chartY + chartH - (last.score / 10) * chartH;
         ctx.beginPath();
         ctx.arc(dotX, dotY, 4, 0, 2 * Math.PI);
-        ctx.fillStyle = color;
+        ctx.fillStyle = series.color;
         ctx.fill();
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 2;
         ctx.stroke();
     }
+
+    _drawLegend(ctx, chartX, chartW, w) {
+        this._legendHitAreas = [];
+        const legendY = 6;
+        const itemH = 16;
+        ctx.font = '11px "Segoe UI", Arial, sans-serif';
+
+        // Measure total legend width
+        const items = Object.entries(this.series);
+        const itemWidths = items.map(([, s]) => ctx.measureText(s.label).width + 30);
+        const totalWidth = itemWidths.reduce((a, b) => a + b + 8, -8);
+        let legendX = Math.max(chartX + 120, chartX + chartW - totalWidth);
+
+        for (let i = 0; i < items.length; i++) {
+            const [key, series] = items[i];
+            const labelW = ctx.measureText(series.label).width;
+            const itemW = labelW + 28;
+
+            // Hit area
+            this._legendHitAreas.push({ key, x: legendX - 2, y: legendY - 2, w: itemW + 4, h: itemH + 4 });
+
+            // Line sample
+            const alpha = series.visible ? 1 : 0.3;
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = series.color;
+            ctx.lineWidth = series.lineWidth;
+            ctx.setLineDash(series.dash);
+            ctx.beginPath();
+            ctx.moveTo(legendX, legendY + 7);
+            ctx.lineTo(legendX + 18, legendY + 7);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Label
+            ctx.fillStyle = series.visible ? '#333' : '#aaa';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            ctx.fillText(series.label, legendX + 22, legendY);
+
+            ctx.globalAlpha = 1;
+            legendX += itemW + 8;
+        }
+    }
+
+    _drawStats(ctx, chartX, chartY, chartW, chartH, elapsed) {
+        const parts = [];
+
+        if (this.series.total.data.length > 0) {
+            const scores = this.series.total.data.map(s => s.score);
+            const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+            const max = Math.max(...scores);
+            parts.push(`Avg: ${avg.toFixed(1)}  Peak: ${max.toFixed(1)}`);
+        }
+
+        parts.push(this._formatTime(elapsed));
+
+        ctx.textAlign = 'right';
+        ctx.fillStyle = '#888';
+        ctx.font = '11px "Segoe UI", Arial, sans-serif';
+        ctx.fillText(parts.join('  |  '), chartX + chartW, chartY + chartH + 24);
+    }
+
+    _roundRect(ctx, x, y, w, h, r) {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+    }
+
+    // ── Zoom ────────────────────────────────────────────────────
 
     zoomIn() {
         if (this.zoomIndex > 0) {
