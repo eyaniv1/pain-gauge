@@ -47,6 +47,9 @@ class SessionChart {
         // Click handler
         this.canvas.addEventListener('click', (e) => this._handleClick(e));
 
+        // Cursor handler — pointer over legend checkboxes, crosshair elsewhere
+        this.canvas.addEventListener('mousemove', (e) => this._handleMouseMove(e));
+
         // Animation
         this._animFrame = null;
         this._startRender();
@@ -516,35 +519,71 @@ class SessionChart {
         ctx.stroke();
     }
 
+    _handleMouseMove(e) {
+        const rect = this.canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        for (const hit of this._legendHitAreas) {
+            if (mx >= hit.x && mx <= hit.x + hit.w && my >= hit.y && my <= hit.y + hit.h) {
+                this.canvas.style.cursor = 'pointer';
+                return;
+            }
+        }
+        this.canvas.style.cursor = 'crosshair';
+    }
+
     _drawLegend(ctx, chartX, chartW, w) {
         this._legendHitAreas = [];
         const legendY = 6;
         const itemH = 16;
+        const checkSize = 10;
         ctx.font = '11px "Segoe UI", Arial, sans-serif';
 
-        // Measure total legend width
+        // Measure total legend width: checkbox(10) + gap(5) + lineSwath(18) + gap(4) + label
         const items = Object.entries(this.series);
-        const itemWidths = items.map(([, s]) => ctx.measureText(s.label).width + 30);
-        const totalWidth = itemWidths.reduce((a, b) => a + b + 8, -8);
+        const itemWidths = items.map(([, s]) => checkSize + 5 + 18 + 4 + ctx.measureText(s.label).width);
+        const totalWidth = itemWidths.reduce((a, b) => a + b + 10, -10);
         let legendX = Math.max(chartX + 120, chartX + chartW - totalWidth);
 
         for (let i = 0; i < items.length; i++) {
             const [key, series] = items[i];
             const labelW = ctx.measureText(series.label).width;
-            const itemW = labelW + 28;
+            const itemW = checkSize + 5 + 18 + 4 + labelW;
 
             // Hit area
             this._legendHitAreas.push({ key, x: legendX - 2, y: legendY - 2, w: itemW + 4, h: itemH + 4 });
 
-            // Line sample
-            const alpha = series.visible ? 1 : 0.3;
+            const alpha = series.visible ? 1 : 0.35;
             ctx.globalAlpha = alpha;
+
+            // Checkbox
+            const cbX = legendX;
+            const cbY = legendY + 2;
+            ctx.strokeStyle = series.visible ? series.color : '#aaa';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([]);
+            ctx.strokeRect(cbX, cbY, checkSize, checkSize);
+
+            if (series.visible) {
+                // Checkmark
+                ctx.strokeStyle = series.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cbX + 2, cbY + 5);
+                ctx.lineTo(cbX + 4, cbY + 8);
+                ctx.lineTo(cbX + 8, cbY + 2);
+                ctx.stroke();
+            }
+
+            // Line sample swatch
+            const swatchStartX = cbX + checkSize + 5;
             ctx.strokeStyle = series.color;
             ctx.lineWidth = series.lineWidth;
             ctx.setLineDash(series.dash);
             ctx.beginPath();
-            ctx.moveTo(legendX, legendY + 7);
-            ctx.lineTo(legendX + 18, legendY + 7);
+            ctx.moveTo(swatchStartX, legendY + 7);
+            ctx.lineTo(swatchStartX + 18, legendY + 7);
             ctx.stroke();
             ctx.setLineDash([]);
 
@@ -552,10 +591,10 @@ class SessionChart {
             ctx.fillStyle = series.visible ? '#333' : '#aaa';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'top';
-            ctx.fillText(series.label, legendX + 22, legendY);
+            ctx.fillText(series.label, swatchStartX + 22, legendY);
 
             ctx.globalAlpha = 1;
-            legendX += itemW + 8;
+            legendX += itemW + 10;
         }
     }
 
