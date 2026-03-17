@@ -464,6 +464,8 @@
         setTimeout(() => {
             moveVideoToMain();
             showScreen(screenMain);
+            // Start loading Pose model after calibration (non-blocking)
+            initPose();
         }, 800);
     }
 
@@ -665,24 +667,9 @@
 
     faceMesh.onResults(onResults);
 
-    // ── MediaPipe Pose setup ────────────────────────────────────
+    // ── MediaPipe Pose setup (lazy — loaded after calibration) ──
 
-    const pose = new Pose({
-        locateFile: (file) => {
-            return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
-        },
-    });
-
-    pose.setOptions({
-        modelComplexity: 1,       // 0=lite, 1=full, 2=heavy
-        smoothLandmarks: true,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-    });
-
-    pose.onResults(onPoseResults);
-
-    // Track pose readiness — first send initializes the WASM module
+    let pose = null;
     let poseReady = false;
     let poseInitializing = false;
     let poseSendPending = false;
@@ -691,11 +678,28 @@
         if (poseInitializing || poseReady) return;
         poseInitializing = true;
         try {
-            // First send triggers WASM load; do it once and wait
+            pose = new Pose({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+                },
+            });
+
+            pose.setOptions({
+                modelComplexity: 0,       // 0=lite for speed
+                smoothLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5,
+            });
+
+            pose.onResults(onPoseResults);
+
+            // First send triggers WASM download + compile
             await pose.send({ image: videoEl });
             poseReady = true;
+            console.log('Pose model ready');
         } catch (e) {
             console.warn('Pose init failed, will retry:', e);
+            pose = null;
         }
         poseInitializing = false;
     }
@@ -720,16 +724,13 @@
                 poseStatusBadge.classList.add('active');
             }
 
-            // Calibrate body motion during face calibration
-            if (isCalibrating) {
+            // Auto-calibrate body motion from first ~30 frames
+            if (!bodyMotion.isCalibrated() || bodyMotion._calibSamples.length < 30) {
                 bodyMotion.calibrate(latestPoseLandmarks);
             }
 
-            // Process body motion
-            if (bodyMotion.isCalibrated() || bodyMotion._calibSamples.length === 0) {
-                const bodyResult = bodyMotion.process(latestPoseLandmarks);
-                updateBodyMotionUI(bodyResult);
-            }
+            const bodyResult = bodyMotion.process(latestPoseLandmarks);
+            updateBodyMotionUI(bodyResult);
 
             // Draw pose skeleton on overlay
             drawPoseSkeleton(results.poseLandmarks);
@@ -918,8 +919,6 @@
             // Mirror front camera, don't mirror rear
             videoEl.style.transform = useFrontCamera ? '' : 'scaleX(1)';
             overlayEl.style.transform = useFrontCamera ? '' : 'scaleX(1)';
-            // Initialize Pose model in background (non-blocking)
-            initPose();
         } catch (err) {
             console.error('Camera start failed:', err);
             // If rear camera failed, fall back to front
@@ -978,7 +977,6 @@
             videoEl.pause();
             videoEl.currentTime = 0;
             startVideoLoop();
-            initPose();
         });
     }
 
