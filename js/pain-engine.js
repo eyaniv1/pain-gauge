@@ -30,8 +30,9 @@ class PainEngine {
         this.au43Sensitivity = options.au43Sensitivity ?? 8;
         this.talkingSuppression = options.talkingSuppression ?? 0.5;
 
-        // Physiological fusion parameters
-        this.hrWeight = options.hrWeight ?? 0.3;  // 0 = face only, 1 = physio only
+        // Multimodal fusion parameters
+        this.hrWeight = options.hrWeight ?? 0.3;    // HR contribution
+        this.bodyWeight = options.bodyWeight ?? 0.2; // Body motion contribution
         this.hrBaseline = null;  // { hr, hrv } captured during calibration
         this._hrCalibSamples = [];
     }
@@ -233,9 +234,10 @@ class PainEngine {
      *
      * @param {Array} landmarks - MediaPipe Face Mesh landmarks (468 points)
      * @param {{ hr: number, hrv: number }|null} physio - optional physiological data
-     * @returns {{ score: number, rawScore: number, aus: object, pspi: number, hrPain: number|null }}
+     * @param {number|null} bodyPainScore - optional body motion pain score (0-10)
+     * @returns {{ score: number, rawScore: number, aus: object, pspi: number, hrPain: number|null, bodyPain: number|null }}
      */
-    process(landmarks, physio) {
+    process(landmarks, physio, bodyPainScore) {
         if (!landmarks || landmarks.length < 468) {
             return this.lastResult || { score: 0, rawScore: 0, aus: { au4: 0, au6_7: 0, au9_10: 0, au43: 0 }, pspi: 0 };
         }
@@ -301,18 +303,33 @@ class PainEngine {
         }
         facePain = Math.max(0, Math.min(10, facePain));
 
-        // ── Physiological fusion ──
-        // Blend face score with HR-based pain score when available
+        // ── Multimodal fusion ──
+        // Blend face score with HR and body motion scores when available
         let hrPainScore = null;
         let rawPain = facePain;
 
         if (physio && this.hrBaseline) {
             hrPainScore = this.computeHRPainScore(physio.hr, physio.hrv);
-            if (hrPainScore !== null && this.hrWeight > 0) {
-                // Weighted blend: face × (1 - weight) + physio × weight
-                rawPain = facePain * (1 - this.hrWeight) + hrPainScore * this.hrWeight;
-                rawPain = Math.max(0, Math.min(10, rawPain));
-            }
+        }
+
+        // Compute weighted fusion: normalize weights for active modalities
+        const activeWeights = { face: 1 };
+        if (hrPainScore !== null && this.hrWeight > 0) activeWeights.hr = this.hrWeight;
+        if (bodyPainScore !== null && this.bodyWeight > 0) activeWeights.body = this.bodyWeight;
+
+        // Face gets remaining weight after HR and body
+        const totalExtra = (activeWeights.hr || 0) + (activeWeights.body || 0);
+        if (totalExtra > 0) {
+            // Cap total extra at 0.8 so face always contributes at least 20%
+            const scale = totalExtra > 0.8 ? 0.8 / totalExtra : 1;
+            const hrW = (activeWeights.hr || 0) * scale;
+            const bodyW = (activeWeights.body || 0) * scale;
+            const faceW = 1 - hrW - bodyW;
+
+            rawPain = facePain * faceW
+                + (hrPainScore || 0) * hrW
+                + (bodyPainScore || 0) * bodyW;
+            rawPain = Math.max(0, Math.min(10, rawPain));
         }
 
         // Temporal smoothing (exponential moving average)
@@ -327,6 +344,7 @@ class PainEngine {
             rawScore: Math.round(rawPain * 10) / 10,
             facePain: Math.round(facePain * 10) / 10,
             hrPain: hrPainScore !== null ? Math.round(hrPainScore * 10) / 10 : null,
+            bodyPain: bodyPainScore !== null ? Math.round(bodyPainScore * 10) / 10 : null,
             aus: {
                 au4: Math.round(Math.max(0, au4Score) * 10) / 10,
                 au6_7: Math.round(Math.max(0, au6_7Score) * 10) / 10,

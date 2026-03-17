@@ -15,6 +15,7 @@ class SessionChart {
         this.samples = [];       // { time: seconds, score: 0-10 }
         this.aiSamples = [];     // { time: seconds, score: 0-10 } — AI scores
         this.hrSamples = [];     // { time: seconds, bpm: number }
+        this.bodySamples = [];   // { time: seconds, score: 0-10 }
         this.isRecording = false;
         this.startTime = null;
         this.maxVisibleSeconds = 120; // 2 minutes visible window, scrolls
@@ -26,6 +27,7 @@ class SessionChart {
         this.pspiColor = '#2980b9';   // blue for PSPI
         this.aiColor = 'rgba(192, 57, 43, 0.5)';  // dimmer red for AI
         this.hrColor = '#e74c3c';     // red for heart rate
+        this.bodyColor = '#27ae60';   // green for body motion
 
         // Zoom
         this.zoomLevels = [30, 60, 120, 300, 600]; // seconds
@@ -41,6 +43,7 @@ class SessionChart {
         this.samples = [];
         this.aiSamples = [];
         this.hrSamples = [];
+        this.bodySamples = [];
         this.startTime = performance.now();
         this.isRecording = true;
     }
@@ -54,6 +57,7 @@ class SessionChart {
         this.samples = [];
         this.aiSamples = [];
         this.hrSamples = [];
+        this.bodySamples = [];
         this.startTime = null;
         this.stoppedElapsed = null;
         this.isRecording = false;
@@ -74,6 +78,12 @@ class SessionChart {
         if (!this.isRecording || this.startTime === null) return;
         const elapsed = (performance.now() - this.startTime) / 1000;
         this.hrSamples.push({ time: elapsed, bpm });
+    }
+
+    addBodySample(score) {
+        if (!this.isRecording || this.startTime === null) return;
+        const elapsed = (performance.now() - this.startTime) / 1000;
+        this.bodySamples.push({ time: elapsed, score });
     }
 
     /** Load historical samples from backend (array of { timestamp_ms, score, ai_score }) */
@@ -259,6 +269,14 @@ class SessionChart {
             this._drawLine(ctx, visibleAI, chartX, chartY, chartH, timeStart, timeSpan, this.aiColor);
         }
 
+        // Plot Body Motion data (green, same Y-axis as pain 0-10)
+        const hasBody = this.bodySamples.length > 0;
+        const visibleBody = hasBody ? this.bodySamples.filter(s => s.time >= timeStart && s.time <= timeEnd) : [];
+
+        if (visibleBody.length > 1) {
+            this._drawLine(ctx, visibleBody, chartX, chartY, chartH, timeStart, timeSpan, this.bodyColor);
+        }
+
         // Plot HR data (red, secondary Y-axis: 40-180 bpm)
         const hasHR = this.hrSamples.length > 0;
         const visibleHR = hasHR ? this.hrSamples.filter(s => s.time >= timeStart && s.time <= timeEnd) : [];
@@ -326,9 +344,10 @@ class SessionChart {
         ctx.fillText(this.chartTitle || 'Session Pain History', chartX, 8);
 
         // Legend
-        const hasLegend = hasAI || hasHR;
+        const hasLegend = hasAI || hasHR || hasBody;
         if (hasLegend) {
-            let legendX = chartX + chartW - (hasAI && hasHR ? 220 : hasHR ? 150 : 150);
+            const legendItems = 1 + (hasAI ? 1 : 0) + (hasBody ? 1 : 0) + (hasHR ? 1 : 0);
+            let legendX = chartX + chartW - legendItems * 60;
             const legendY = 6;
             ctx.font = '11px "Segoe UI", Arial, sans-serif';
             ctx.textAlign = 'left';
@@ -358,6 +377,19 @@ class SessionChart {
                 legendX += 50;
             }
 
+            if (hasBody) {
+                // Body legend
+                ctx.strokeStyle = this.bodyColor;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(legendX, legendY + 6);
+                ctx.lineTo(legendX + 20, legendY + 6);
+                ctx.stroke();
+                ctx.fillStyle = '#555';
+                ctx.fillText('Body', legendX + 24, legendY);
+                legendX += 60;
+            }
+
             if (hasHR) {
                 // HR legend (dashed)
                 ctx.strokeStyle = this.hrColor;
@@ -385,6 +417,12 @@ class SessionChart {
                 const aiAvg = aiScores.reduce((a, b) => a + b, 0) / aiScores.length;
                 const aiMax = Math.max(...aiScores);
                 statsText += `  |  AI Avg: ${aiAvg.toFixed(1)}  Peak: ${aiMax.toFixed(1)}`;
+            }
+
+            if (hasBody) {
+                const bodyScores = this.bodySamples.map(s => s.score);
+                const bodyAvg = bodyScores.reduce((a, b) => a + b, 0) / bodyScores.length;
+                statsText += `  |  Body Avg: ${bodyAvg.toFixed(1)}`;
             }
 
             if (hasHR) {

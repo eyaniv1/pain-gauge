@@ -23,6 +23,7 @@
         au43Sensitivity: 8,
         talkingSuppression: 0.5,
         hrWeight: 0.3,
+        bodyWeight: 0.2,
         smoothingSize: 8,
         sampleIntervalMs: 500,
         backendUrl: '',
@@ -115,6 +116,7 @@
         au43Sensitivity:    { input: 'set-au43-sens',   display: 'val-au43-sens' },
         talkingSuppression: { input: 'set-talk-supp',   display: 'val-talk-supp' },
         hrWeight:           { input: 'set-hr-weight',   display: 'val-hr-weight' },
+        bodyWeight:         { input: 'set-body-weight', display: 'val-body-weight' },
         smoothingSize:      { input: 'set-smooth-win',  display: 'val-smooth-win' },
         sampleIntervalMs:   { input: 'set-sample-int',  display: 'val-sample-int' },
     };
@@ -836,9 +838,10 @@
             engine.calibrateHR(bleHR.heartRate, bleHR.hrv);
         }
 
-        // Build physiological data for fusion
+        // Build multimodal data for fusion
         const physio = bleHR.isActive() ? { hr: bleHR.heartRate, hrv: bleHR.hrv } : null;
-        const result = engine.process(landmarks, physio);
+        const bodyScore = (bodyMotion.lastResult && poseReady) ? bodyMotion.lastResult.score : null;
+        const result = engine.process(landmarks, physio, bodyScore);
         gauge.setScore(result.score);
         updateAUBars(result.aus);
         lastResult = result;
@@ -847,6 +850,10 @@
         const hrPainEl = document.getElementById('hr-pain');
         if (hrPainEl) {
             hrPainEl.textContent = result.hrPain !== null ? result.hrPain.toFixed(1) : '--';
+        }
+        // Record body pain to chart
+        if (bodyScore !== null) {
+            chart.addBodySample(bodyScore);
         }
         maybeRecordSample(result);
     }
