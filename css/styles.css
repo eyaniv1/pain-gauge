@@ -1473,7 +1473,21 @@ footer {
     }
 
     .settings-panel {
-        padding: 10px 16px;
+        padding: 10px 12px;
+    }
+
+    .settings-group {
+        padding: 6px 10px 8px;
+        margin-bottom: 8px;
+    }
+
+    .settings-group legend {
+        font-size: 10px;
+    }
+
+    .setting-item label {
+        min-width: 100px;
+        font-size: 11px;
     }
 
     /* History table: hide less-important columns on mobile */
@@ -1530,6 +1544,18 @@ footer {
     .au-bar label {
         font-size: 11px;
         width: 40px;
+    }
+
+    .engine-scores {
+        gap: 4px;
+    }
+
+    .engine-score-label {
+        font-size: 9px;
+    }
+
+    .engine-score-value {
+        font-size: 15px;
     }
 
     .hr-panel {
