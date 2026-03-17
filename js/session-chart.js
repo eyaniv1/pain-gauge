@@ -18,6 +18,7 @@ class SessionChart {
             cnn:    { data: [], label: 'CNN',        color: '#c0392b', dash: [5, 4], lineWidth: 1.5, visible: false },
             body:   { data: [], label: 'Body',       color: '#27ae60', dash: [],     lineWidth: 2,   visible: false },
             hr:     { data: [], label: 'HR Pain',    color: '#e67e22', dash: [],     lineWidth: 2,   visible: false },
+            hrBpm:  { data: [], label: 'HR BPM',     color: '#e67e22', dash: [3, 3], lineWidth: 1,   visible: false },
         };
         // HR BPM uses secondary Y-axis, tracked separately
         this.hrBpmSamples = [];
@@ -362,9 +363,9 @@ class SessionChart {
             this._drawLine(ctx, vis, chartX, chartY, chartW, chartH, timeStart, timeSpan, series);
         }
 
-        // HR BPM on secondary axis (only if hr pain line is visible)
+        // HR BPM on secondary axis (controlled by its own legend toggle)
         const hasHRBpm = this.hrBpmSamples.length > 0;
-        if (hasHRBpm && this.series.hr.visible) {
+        if (hasHRBpm && this.series.hrBpm.visible) {
             const hrMin = 40, hrMax = 180;
             const visHR = this.hrBpmSamples.filter(s => s.time >= timeStart && s.time <= timeEnd);
             if (visHR.length > 1) {
