@@ -682,6 +682,34 @@
 
     pose.onResults(onPoseResults);
 
+    // Track pose readiness — first send initializes the WASM module
+    let poseReady = false;
+    let poseInitializing = false;
+    let poseSendPending = false;
+
+    async function initPose() {
+        if (poseInitializing || poseReady) return;
+        poseInitializing = true;
+        try {
+            // First send triggers WASM load; do it once and wait
+            await pose.send({ image: videoEl });
+            poseReady = true;
+        } catch (e) {
+            console.warn('Pose init failed, will retry:', e);
+        }
+        poseInitializing = false;
+    }
+
+    function sendToPose() {
+        if (!poseReady || poseSendPending) return;
+        poseSendPending = true;
+        pose.send({ image: videoEl }).then(() => {
+            poseSendPending = false;
+        }).catch(() => {
+            poseSendPending = false;
+        });
+    }
+
     function onPoseResults(results) {
         if (results.poseLandmarks && results.poseLandmarks.length >= 33) {
             latestPoseLandmarks = results.poseLandmarks;
@@ -876,7 +904,7 @@
             cameraInstance = new Camera(videoEl, {
                 onFrame: async () => {
                     await faceMesh.send({ image: videoEl });
-                    pose.send({ image: videoEl });
+                    sendToPose();
                 },
                 facingMode: useFrontCamera ? 'user' : 'environment',
                 width: 640,
@@ -890,6 +918,8 @@
             // Mirror front camera, don't mirror rear
             videoEl.style.transform = useFrontCamera ? '' : 'scaleX(1)';
             overlayEl.style.transform = useFrontCamera ? '' : 'scaleX(1)';
+            // Initialize Pose model in background (non-blocking)
+            initPose();
         } catch (err) {
             console.error('Camera start failed:', err);
             // If rear camera failed, fall back to front
@@ -948,6 +978,7 @@
             videoEl.pause();
             videoEl.currentTime = 0;
             startVideoLoop();
+            initPose();
         });
     }
 
@@ -956,7 +987,7 @@
             if (inputMode !== 'video') return;
             if (!videoEl.paused && !videoEl.ended && videoEl.readyState >= 2) {
                 await faceMesh.send({ image: videoEl });
-                pose.send({ image: videoEl });
+                sendToPose();
             }
             videoLoopId = requestAnimationFrame(loop);
         }
