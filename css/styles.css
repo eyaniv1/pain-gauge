@@ -548,7 +548,7 @@ main {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 10px;
     min-height: 0;
     overflow-y: auto;
 }
@@ -566,9 +566,34 @@ main {
     width: 100%;
     background: #fff;
     border-radius: 10px;
-    padding: 14px 18px;
+    padding: 10px 14px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     flex-shrink: 0;
+}
+
+/* ── Panel Header with Score ─────────────────────────────── */
+
+.panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.panel-header h3 {
+    font-size: 12px;
+    font-weight: 600;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 0;
+}
+
+.panel-score {
+    font-size: 28px;
+    font-weight: 800;
+    color: #333;
+    line-height: 1;
 }
 
 .au-breakdown h3 {
@@ -670,7 +695,7 @@ main {
     width: 100%;
     background: #fff;
     border-radius: 10px;
-    padding: 14px 18px;
+    padding: 10px 14px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     flex-shrink: 0;
 }
@@ -681,7 +706,7 @@ main {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #888;
-    margin: 0 0 10px;
+    margin: 0;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -729,7 +754,7 @@ main {
     width: 100%;
     background: #fff;
     border-radius: 10px;
-    padding: 14px 18px;
+    padding: 10px 14px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     flex-shrink: 0;
 }
@@ -740,7 +765,7 @@ main {
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: #888;
-    margin: 0 0 10px;
+    margin: 0;
 }
 
 .hr-device-info {
@@ -853,12 +878,6 @@ main {
 
 .btn-hr-disconnect:hover {
     background: #777;
-}
-
-#hr-sensor-btn.active {
-    background: #e74c3c;
-    color: #fff;
-    border-color: #c0392b;
 }
 
 /* ── Footer / Session Controls ───────────────────────────── */
@@ -1352,7 +1371,6 @@ footer {
     #camera-btn { order: 12; }
     #load-video-btn { order: 13; }
     #flip-camera-btn { order: 14; }
-    #hr-sensor-btn { order: 15; }
     #settings-btn { order: 16; }
     .ai-status-dot { order: 17; }
 
@@ -1568,6 +1586,10 @@ footer {
 
     .hr-metric-label small {
         display: none;
+    }
+
+    .panel-score {
+        font-size: 22px;
     }
 }
 

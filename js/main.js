@@ -167,8 +167,6 @@
 
     // ── Heart Rate Sensor UI ──────────────────────────────────
 
-    const hrSensorBtn = document.getElementById('hr-sensor-btn');
-    const hrPanel = document.getElementById('hr-panel');
     const hrConnectBtn = document.getElementById('hr-connect-btn');
     const hrSimBtn = document.getElementById('hr-sim-btn');
     const hrDisconnectBtn = document.getElementById('hr-disconnect-btn');
@@ -177,11 +175,6 @@
     const hrRrEl = document.getElementById('hr-rr');
     const hrDeviceName = document.getElementById('hr-device-name');
     const hrStatusBadge = document.getElementById('hr-status-badge');
-
-    hrSensorBtn.addEventListener('click', () => {
-        hrPanel.classList.toggle('hidden');
-        hrSensorBtn.classList.toggle('active', !hrPanel.classList.contains('hidden'));
-    });
 
     hrConnectBtn.addEventListener('click', async () => {
         try {
@@ -220,8 +213,6 @@
         hrConnectBtn.classList.toggle('hidden', isActive);
         hrSimBtn.classList.toggle('hidden', isActive);
         hrDisconnectBtn.classList.toggle('hidden', !isActive);
-        hrSensorBtn.classList.toggle('active', isActive);
-        if (isActive) hrPanel.classList.remove('hidden');
     };
 
     // ── Body Motion Panel DOM refs ────────────────────────────

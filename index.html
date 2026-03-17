@@ -99,7 +99,6 @@
             <button type="button" class="btn btn-small btn-source" id="flip-camera-btn" title="Flip Camera"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></button>
             <button type="button" class="btn btn-small btn-source" id="load-video-btn" title="Load Video File"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg></button>
             <input type="file" id="video-file-input" accept="video/*" class="hidden">
-            <button type="button" class="btn btn-small btn-source" id="hr-sensor-btn" title="Heart Rate Sensor"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
             <span id="ai-status-dot" class="ai-status-dot offline" title="AI Engine: checking..."></span>
             <button type="button" class="btn btn-small" id="settings-btn" title="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
         </header>
@@ -320,7 +319,10 @@
                 <canvas id="gauge"></canvas>
 
                 <div class="au-breakdown">
-                    <h3>Action Unit Breakdown</h3>
+                    <div class="panel-header">
+                        <h3>Face</h3>
+                        <span class="panel-score" id="face-combined-score">--</span>
+                    </div>
                     <div class="au-bar">
                         <label>AU4 <span class="au-label">Brow Lowerer</span></label>
                         <div class="bar-track"><div class="bar-fill" id="au4-bar"></div></div>
@@ -350,15 +352,14 @@
                             <span class="engine-score-label">CNN Engine</span>
                             <span class="engine-score-value" id="cnn-engine-score">--</span>
                         </div>
-                        <div class="engine-score-item">
-                            <span class="engine-score-label">Face Score</span>
-                            <span class="engine-score-value" id="face-combined-score">--</span>
-                        </div>
                     </div>
                 </div>
 
                 <div class="body-motion-panel" id="body-motion-panel">
-                    <h3>Body Motion <span class="pose-status-badge" id="pose-status-badge">Inactive</span></h3>
+                    <div class="panel-header">
+                        <h3>Body Motion <span class="pose-status-badge" id="pose-status-badge">Inactive</span></h3>
+                        <span class="panel-score" id="body-pain-score">--</span>
+                    </div>
                     <div class="body-motion-metrics">
                         <div class="au-bar">
                             <label>Guarding <span class="au-label">Protective</span></label>
@@ -381,14 +382,13 @@
                             <span class="au-value" id="freeze-value">0.0</span>
                         </div>
                     </div>
-                    <div class="body-motion-score">
-                        <span class="body-score-label">Body Pain Score</span>
-                        <span class="body-score-value" id="body-pain-score">--</span>
-                    </div>
                 </div>
 
-                <div class="hr-panel hidden" id="hr-panel">
-                    <h3>Heart Rate Sensor</h3>
+                <div class="hr-panel" id="hr-panel">
+                    <div class="panel-header">
+                        <h3>Heart Rate</h3>
+                        <span class="panel-score" id="hr-pain">--</span>
+                    </div>
                     <div class="hr-device-info">
                         <span class="hr-device-name" id="hr-device-name"></span>
                         <span class="hr-status-badge" id="hr-status-badge">Disconnected</span>
@@ -405,10 +405,6 @@
                         <div class="hr-metric">
                             <span class="hr-metric-value" id="hr-rr">--</span>
                             <span class="hr-metric-label">RR <small>(ms)</small></span>
-                        </div>
-                        <div class="hr-metric">
-                            <span class="hr-metric-value" id="hr-pain">--</span>
-                            <span class="hr-metric-label">HR Pain</span>
                         </div>
                     </div>
                     <div class="hr-actions">
