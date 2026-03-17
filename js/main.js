@@ -693,13 +693,15 @@
 
             // Recompute total using CNN-blended face score instead of AU-only
             // This ensures the CNN contribution flows into the aggregate score
-            let totalScore = faceScore;
-            if (result.hrPain !== null || result.bodyPain !== null) {
-                const activeWeights = { face: engine.faceWeight };
-                if (result.hrPain !== null && engine.hrWeight > 0) activeWeights.hr = engine.hrWeight;
-                if (result.bodyPain !== null && engine.bodyWeight > 0) activeWeights.body = engine.bodyWeight;
-                const totalW = activeWeights.face + (activeWeights.hr || 0) + (activeWeights.body || 0);
-                totalScore = faceScore * (activeWeights.face / totalW)
+            // Only include modalities that have data AND nonzero weight
+            const activeWeights = {};
+            if (engine.faceWeight > 0) activeWeights.face = engine.faceWeight;
+            if (result.hrPain !== null && engine.hrWeight > 0) activeWeights.hr = engine.hrWeight;
+            if (result.bodyPain !== null && engine.bodyWeight > 0) activeWeights.body = engine.bodyWeight;
+            const totalW = (activeWeights.face || 0) + (activeWeights.hr || 0) + (activeWeights.body || 0);
+            let totalScore = 0;
+            if (totalW > 0) {
+                totalScore = (faceScore || 0) * ((activeWeights.face || 0) / totalW)
                     + (result.hrPain || 0) * ((activeWeights.hr || 0) / totalW)
                     + (result.bodyPain || 0) * ((activeWeights.body || 0) / totalW);
             }
@@ -929,16 +931,26 @@
         const physio = bleHR.isActive() ? { hr: bleHR.heartRate, hrv: bleHR.hrv } : null;
         const bodyScore = (bodyMotion.lastResult && poseReady) ? bodyMotion.lastResult.score : null;
         const result = engine.process(landmarks, physio, bodyScore);
-        // Blend CNN into the displayed gauge score (same logic as chart total)
-        let gaugeScore = result.score;
+        // Recompute gauge score with same weighted fusion as chart total
+        // (result.score from pain-engine always includes face; we need to respect weight=0)
+        let faceForGauge = result.score; // smoothed AU face score
         if (lastCnnScore != null && result.facePain != null) {
             const cw = settings.cnnWeight;
-            const blendedFace = result.facePain * (1 - cw) + lastCnnScore * cw;
-            // Replace AU-only face component with CNN-blended face in the total
-            // result.score already has smoothing applied to AU-only; adjust by the CNN delta
-            const cnnDelta = blendedFace - result.facePain;
-            gaugeScore = Math.max(0, Math.min(10, Math.round((result.score + cnnDelta) * 10) / 10));
+            const cnnDelta = (result.facePain * (1 - cw) + lastCnnScore * cw) - result.facePain;
+            faceForGauge = Math.max(0, Math.min(10, result.score + cnnDelta));
         }
+        const gw = {};
+        if (engine.faceWeight > 0) gw.face = engine.faceWeight;
+        if (result.hrPain !== null && engine.hrWeight > 0) gw.hr = engine.hrWeight;
+        if (result.bodyPain !== null && engine.bodyWeight > 0) gw.body = engine.bodyWeight;
+        const gwTotal = (gw.face || 0) + (gw.hr || 0) + (gw.body || 0);
+        let gaugeScore = 0;
+        if (gwTotal > 0) {
+            gaugeScore = (faceForGauge || 0) * ((gw.face || 0) / gwTotal)
+                + (result.hrPain || 0) * ((gw.hr || 0) / gwTotal)
+                + (result.bodyPain || 0) * ((gw.body || 0) / gwTotal);
+        }
+        gaugeScore = Math.max(0, Math.min(10, Math.round(gaugeScore * 10) / 10));
         gauge.setScore(gaugeScore);
         updateAUBars(result.aus);
         updateEngineScores(result);
