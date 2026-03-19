@@ -1109,6 +1109,23 @@ footer {
     margin-top: 16px;
 }
 
+/* ── Camera Select ─────────────────────────────────────── */
+
+.camera-select {
+    font-size: 11px;
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #f5f5f5;
+    color: #333;
+    max-width: 160px;
+    cursor: pointer;
+}
+
+.camera-select:hover {
+    border-color: #999;
+}
+
 /* ── Source Buttons ──────────────────────────────────────── */
 
 .btn-source,
@@ -1393,7 +1410,7 @@ footer {
     #recalibrate-btn { order: 11; }
     #camera-btn { order: 12; }
     #load-video-btn { order: 13; }
-    #flip-camera-btn { order: 14; }
+    #camera-select { order: 14; }
     #settings-btn { order: 16; }
     .ai-status-dot { order: 17; }
 
@@ -1553,10 +1570,9 @@ footer {
         min-width: 40px;
     }
 
-    /* Flip camera button */
-    #flip-camera-btn {
+    #camera-select {
         min-height: 40px;
-        min-width: 40px;
+        max-width: 140px;
     }
 }
 

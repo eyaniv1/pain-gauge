@@ -1071,60 +1071,114 @@
         }
     }
 
-    // ── Start camera ──────────────────────────────────────────────
+    // ── Camera device selection ──────────────────────────────────
 
-    let useFrontCamera = true;
-    const flipCameraBtn = document.getElementById('flip-camera-btn');
+    const cameraSelect = document.getElementById('camera-select');
+    let cameraLoopId = null;
+
+    async function enumeratecameras() {
+        try {
+            // Request permission first so labels are available
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            tempStream.getTracks().forEach(t => t.stop());
+
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+            cameraSelect.innerHTML = '';
+            videoDevices.forEach((device, i) => {
+                const option = document.createElement('option');
+                option.value = device.deviceId;
+                option.textContent = device.label || `Camera ${i + 1}`;
+                cameraSelect.appendChild(option);
+            });
+
+            // If we had a previously selected device, restore it
+            const saved = localStorage.getItem('selectedCameraId');
+            if (saved && videoDevices.some(d => d.deviceId === saved)) {
+                cameraSelect.value = saved;
+            }
+        } catch (err) {
+            console.error('Failed to enumerate cameras:', err);
+            cameraSelect.innerHTML = '<option value="">No cameras found</option>';
+        }
+    }
+
+    function stopCameraLoop() {
+        if (cameraLoopId) {
+            cancelAnimationFrame(cameraLoopId);
+            cameraLoopId = null;
+        }
+    }
 
     async function startCamera() {
         stopVideoLoop();
+        stopCameraLoop();
 
-        // Stop existing camera if any
+        // Stop existing camera stream
         if (cameraInstance) {
-            try { cameraInstance.stop(); } catch (e) { /* ignore */ }
+            try {
+                if (cameraInstance instanceof MediaStream) {
+                    cameraInstance.getTracks().forEach(t => t.stop());
+                } else {
+                    cameraInstance.stop();
+                }
+            } catch (e) { /* ignore */ }
             cameraInstance = null;
         }
 
-        try {
-            cameraInstance = new Camera(videoEl, {
-                onFrame: async () => {
-                    await faceMesh.send({ image: videoEl });
-                    sendToPose();
-                },
-                facingMode: useFrontCamera ? 'user' : 'environment',
-                width: 640,
-                height: 480,
-            });
+        const deviceId = cameraSelect.value;
+        if (!deviceId) return;
 
-            await cameraInstance.start();
+        localStorage.setItem('selectedCameraId', deviceId);
+
+        try {
+            const constraints = {
+                video: {
+                    deviceId: { exact: deviceId },
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                },
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            cameraInstance = stream;
+            videoEl.srcObject = stream;
+            videoEl.muted = true;
+            await videoEl.play();
+
             inputMode = 'camera';
             cameraBtn.classList.add('active');
             loadVideoBtn.classList.remove('active');
-            // Mirror front camera, don't mirror rear
-            videoEl.style.transform = useFrontCamera ? '' : 'scaleX(1)';
-            overlayEl.style.transform = useFrontCamera ? '' : 'scaleX(1)';
+            videoEl.style.transform = '';
+            overlayEl.style.transform = '';
+
+            // Start frame processing loop
+            async function cameraLoop() {
+                if (inputMode !== 'camera') return;
+                if (videoEl.readyState >= 2) {
+                    await faceMesh.send({ image: videoEl });
+                    sendToPose();
+                }
+                cameraLoopId = requestAnimationFrame(cameraLoop);
+            }
+            cameraLoop();
         } catch (err) {
             console.error('Camera start failed:', err);
-            // If rear camera failed, fall back to front
-            if (!useFrontCamera) {
-                useFrontCamera = true;
-                startCamera();
-            }
         }
     }
+
+    cameraSelect.addEventListener('change', () => {
+        if (inputMode === 'camera') {
+            startCamera();
+        }
+    });
 
     // ── Video file input ─────────────────────────────────────────
 
     cameraBtn.addEventListener('click', () => {
         if (inputMode === 'camera') return;
         startCamera();
-    });
-
-    flipCameraBtn.addEventListener('click', () => {
-        useFrontCamera = !useFrontCamera;
-        if (inputMode === 'camera') {
-            startCamera();
-        }
     });
 
     loadVideoBtn.addEventListener('click', () => {
@@ -1139,8 +1193,13 @@
     });
 
     function loadVideoFile(file) {
+        stopCameraLoop();
         if (cameraInstance) {
-            cameraInstance.stop();
+            if (cameraInstance instanceof MediaStream) {
+                cameraInstance.getTracks().forEach(t => t.stop());
+            } else {
+                try { cameraInstance.stop(); } catch (e) { /* ignore */ }
+            }
             cameraInstance = null;
         }
         stopVideoLoop();
@@ -1505,6 +1564,6 @@
     // ── Initialize ───────────────────────────────────────────────
 
     initBackend();
-    startCamera();
+    enumeratecameras().then(() => startCamera());
     startAIStatusPolling();
 })();
