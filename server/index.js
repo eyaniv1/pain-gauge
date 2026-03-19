@@ -86,6 +86,11 @@ const aiColumns = [
     { name: 'corrected_score', type: 'REAL' },
     { name: 'corrected_by', type: 'TEXT' },
     { name: 'corrected_at', type: 'TEXT' },
+    { name: 'face_score', type: 'REAL' },
+    { name: 'au_score', type: 'REAL' },
+    { name: 'cnn_score', type: 'REAL' },
+    { name: 'body_score', type: 'REAL' },
+    { name: 'hr_score', type: 'REAL' },
 ];
 
 const existingColumns = db.pragma('table_info(samples)').map(c => c.name);
@@ -116,7 +121,7 @@ const stmts = {
 
     // Samples
     listSamples: db.prepare('SELECT * FROM samples WHERE session_id = ? ORDER BY timestamp_ms'),
-    insertSample: db.prepare('INSERT INTO samples (session_id, timestamp_ms, score, raw_score, pspi, sensor_data, frame_filename, ai_score, ai_confidence, model_version) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
+    insertSample: db.prepare('INSERT INTO samples (session_id, timestamp_ms, score, raw_score, pspi, sensor_data, frame_filename, ai_score, ai_confidence, model_version, face_score, au_score, cnn_score, body_score, hr_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'),
     correctSample: db.prepare('UPDATE samples SET corrected_score = ?, corrected_by = ?, corrected_at = ? WHERE id = ?'),
     getSample: db.prepare('SELECT * FROM samples WHERE id = ?'),
 };
@@ -127,7 +132,12 @@ const insertSamplesBatch = db.transaction((samples) => {
         stmts.insertSample.run(
             s.session_id, s.timestamp_ms, s.score, s.raw_score, s.pspi,
             s.sensor_data, s.frame_filename,
-            s.ai_score || null, s.ai_confidence || null, s.model_version || null
+            s.ai_score || null, s.ai_confidence || null, s.model_version || null,
+            s.face_score != null ? s.face_score : null,
+            s.au_score != null ? s.au_score : null,
+            s.cnn_score != null ? s.cnn_score : null,
+            s.body_score != null ? s.body_score : null,
+            s.hr_score != null ? s.hr_score : null
         );
     }
 });
@@ -363,6 +373,11 @@ app.post('/api/sessions/:id/samples', async (req, res) => {
             ai_score: aiResult ? aiResult.ai_score : null,
             ai_confidence: aiResult ? aiResult.confidence : null,
             model_version: aiResult ? aiResult.model_version : null,
+            face_score: sample.face_score != null ? sample.face_score : null,
+            au_score: sample.au_score != null ? sample.au_score : null,
+            cnn_score: sample.cnn_score != null ? sample.cnn_score : null,
+            body_score: sample.body_score != null ? sample.body_score : null,
+            hr_score: sample.hr_score != null ? sample.hr_score : null,
         });
     }
 

@@ -1286,6 +1286,11 @@ footer {
     text-decoration: underline;
 }
 
+.score-with-tip {
+    cursor: default;
+    border-bottom: 1px dotted #999;
+}
+
 .frame-thumb {
     width: 52px;
     height: 38px;

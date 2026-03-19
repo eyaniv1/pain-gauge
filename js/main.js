@@ -776,12 +776,23 @@
                     score: result.score,
                     raw_score: result.rawScore,
                     pspi: result.pspi,
+                    face_score: faceScore != null ? Math.round(faceScore * 10) / 10 : null,
+                    au_score: result.facePain != null ? result.facePain : null,
+                    cnn_score: lastCnnScore != null ? Math.round(lastCnnScore * 10) / 10 : null,
+                    body_score: result.bodyPain,
+                    hr_score: result.hrPain,
                     sensor_data: {
                         face: result.aus,
                         hr: bleHR.isActive() ? {
                             bpm: bleHR.heartRate,
                             hrv: bleHR.hrv,
                             rr: bleHR.rrIntervals.length > 0 ? bleHR.rrIntervals[bleHR.rrIntervals.length - 1] : null,
+                        } : undefined,
+                        body: (bodyMotion.lastResult && poseReady) ? {
+                            guarding: bodyMotion.lastResult.guarding || 0,
+                            bracing: bodyMotion.lastResult.bracing || 0,
+                            restlessness: bodyMotion.lastResult.restlessness || 0,
+                            freezing: bodyMotion.lastResult.freezing || 0,
                         } : undefined,
                     },
                     frame,
@@ -1449,14 +1460,14 @@
         const startDate = new Date(session.start_time);
         historySessionTitle.textContent = `Session ${session.id.substring(0, 8)} — ${formatDateTime(startDate)}`;
 
-        historySamplesTbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999">Loading...</td></tr>';
+        historySamplesTbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999">Loading...</td></tr>';
 
         const samples = await PainGaugeAPI.getSamples(session.id);
         currentHistorySamples = samples;
         historySamplesTbody.innerHTML = '';
 
         if (samples.length === 0) {
-            historySamplesTbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#999">No samples</td></tr>';
+            historySamplesTbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999">No samples</td></tr>';
             return;
         }
 
@@ -1465,16 +1476,9 @@
 
         for (const s of samples) {
             const tr = document.createElement('tr');
-            const face = s.sensor_data && s.sensor_data.face ? s.sensor_data.face : {};
+            const hr = s.sensor_data && s.sensor_data.hr ? s.sensor_data.hr : {};
+            const body = s.sensor_data && s.sensor_data.body ? s.sensor_data.body : {};
             const timeStr = formatMs(s.timestamp_ms);
-
-            // AI score badge with confidence coloring
-            let aiScoreHtml = '-';
-            if (s.ai_score != null) {
-                const conf = s.ai_confidence || 0;
-                const confClass = conf > 0.7 ? 'high-confidence' : conf > 0.5 ? 'med-confidence' : 'low-confidence';
-                aiScoreHtml = `<span class="ai-score-badge ${confClass}">${s.ai_score.toFixed(1)}</span>`;
-            }
 
             // Correction cell with edit button
             let correctionHtml;
@@ -1490,16 +1494,36 @@
                 ? `<img class="frame-thumb" src="${PainGaugeAPI.frameUrl(s.frame_filename)}" data-frame="${s.frame_filename}" data-time="${timeStr}" alt="Frame at ${timeStr}" loading="lazy">`
                 : '-';
 
+            // Face score with tooltip showing AU and CNN breakdown
+            const faceVal = s.face_score != null ? s.face_score : (s.score != null ? s.score : null);
+            const auVal = s.au_score != null ? s.au_score.toFixed(1) : (s.pspi != null ? s.pspi.toFixed(1) : '-');
+            const cnnVal = s.cnn_score != null ? s.cnn_score.toFixed(1) : (s.ai_score != null ? s.ai_score.toFixed(1) : '-');
+            const faceTooltip = `AU=${auVal}  CNN=${cnnVal}`;
+            const faceHtml = faceVal != null
+                ? `<span class="score-with-tip" title="${faceTooltip}">${faceVal.toFixed(1)}</span>`
+                : '-';
+
+            // Body score with tooltip showing component breakdown
+            const bodyVal = s.body_score != null ? s.body_score : null;
+            const bodyTooltip = `Guarding=${(body.guarding || 0).toFixed(1)}  Bracing=${(body.bracing || 0).toFixed(1)}  Restlessness=${(body.restlessness || 0).toFixed(1)}  Freezing=${(body.freezing || 0).toFixed(1)}`;
+            const bodyHtml = bodyVal != null
+                ? `<span class="score-with-tip" title="${bodyTooltip}">${bodyVal.toFixed(1)}</span>`
+                : '-';
+
+            // HR score with tooltip showing BPM and HRV
+            const hrVal = s.hr_score != null ? s.hr_score : null;
+            const hrTooltip = `BPM=${hr.bpm != null ? hr.bpm : '-'}  HRV=${hr.hrv != null ? hr.hrv.toFixed(0) + 'ms' : '-'}`;
+            const hrHtml = hrVal != null
+                ? `<span class="score-with-tip" title="${hrTooltip}">${hrVal.toFixed(1)}</span>`
+                : '-';
+
             tr.innerHTML = `
                 <td>${timeStr}</td>
                 <td>${s.score != null ? s.score.toFixed(1) : '-'}</td>
-                <td class="col-hide-mobile">${s.pspi != null ? s.pspi.toFixed(2) : '-'}</td>
-                <td class="col-hide-mobile">${aiScoreHtml}</td>
                 <td class="correction-cell">${correctionHtml}</td>
-                <td class="col-hide-mobile">${face.au4 != null ? face.au4.toFixed(1) : '-'}</td>
-                <td class="col-hide-mobile">${face.au6_7 != null ? face.au6_7.toFixed(1) : '-'}</td>
-                <td class="col-hide-mobile">${face.au9_10 != null ? face.au9_10.toFixed(1) : '-'}</td>
-                <td class="col-hide-mobile">${face.au43 != null ? face.au43.toFixed(1) : '-'}</td>
+                <td>${faceHtml}</td>
+                <td>${bodyHtml}</td>
+                <td>${hrHtml}</td>
                 <td class="frame-cell">${frameThumb}</td>
             `;
 
