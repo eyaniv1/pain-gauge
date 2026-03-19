@@ -91,6 +91,7 @@
     const calibStatus = document.getElementById('calib-status');
     const baselinePainInput = document.getElementById('baseline-pain');
     const cancelCalibrateBtn = document.getElementById('cancel-calibrate-btn');
+    const backToMainBtn = document.getElementById('back-to-main-btn');
 
     // ── DOM refs: Main ────────────────────────────────────────────
 
@@ -529,6 +530,22 @@
         if (inputMode === 'video') {
             videoEl.pause();
         }
+    });
+
+    backToMainBtn.addEventListener('click', () => {
+        // Abort calibration if in progress
+        if (isCalibrating) {
+            isCalibrating = false;
+            calibrationFrames = 0;
+            engine.resetCalibration();
+            bodyMotion.resetCalibration();
+            cancelCalibrateBtn.classList.add('hidden');
+            calibProgress.classList.add('hidden');
+            if (inputMode === 'video') videoEl.pause();
+        }
+        markNeedsCalibration();
+        moveVideoToMain();
+        showScreen(screenMain);
     });
 
     async function onCalibrationComplete() {
