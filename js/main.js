@@ -630,12 +630,12 @@
     const frameCtx = frameCanvas.getContext('2d');
 
     function captureFrame() {
-        const w = 160;
-        const h = 120;
+        const w = 640;
+        const h = 480;
         frameCanvas.width = w;
         frameCanvas.height = h;
         frameCtx.drawImage(videoEl, 0, 0, w, h);
-        return frameCanvas.toDataURL('image/jpeg', 0.6);
+        return frameCanvas.toDataURL('image/jpeg', 0.85);
     }
 
     // ── Session Start / End ───────────────────────────────────────
