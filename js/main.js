@@ -90,6 +90,7 @@
     const calibProgressBar = document.getElementById('calib-progress-bar');
     const calibStatus = document.getElementById('calib-status');
     const baselinePainInput = document.getElementById('baseline-pain');
+    const cancelCalibrateBtn = document.getElementById('cancel-calibrate-btn');
 
     // ── DOM refs: Main ────────────────────────────────────────────
 
@@ -393,12 +394,24 @@
         }
     }
 
+    // Mark that calibration is needed
+    function markNeedsCalibration() {
+        recalibrateBtn.classList.add('needs-calibration');
+    }
+    function clearNeedsCalibration() {
+        recalibrateBtn.classList.remove('needs-calibration');
+    }
+
+    // On startup, calibration is always needed
+    markNeedsCalibration();
+
     patientSelect.addEventListener('change', () => {
         currentPatientId = patientSelect.value;
         localStorage.setItem('painGaugePatientId', currentPatientId);
         // Clear chart and reload history for new patient
         chart.resetRecording();
         loadHistorySessions();
+        markNeedsCalibration();
     });
 
     addPatientBtn.addEventListener('click', () => {
@@ -491,6 +504,7 @@
         engine.baselinePainLevel = parseInt(baselinePainInput.value);
         calibrateBtn.disabled = true;
         calibrateBtn.textContent = 'Hold still...';
+        cancelCalibrateBtn.classList.remove('hidden');
         calibInstructions.innerHTML = 'Capturing face at <strong>current pain level</strong>...';
         calibProgress.classList.remove('hidden');
         calibProgressBar.style.width = '0%';
@@ -500,9 +514,28 @@
         }
     });
 
+    cancelCalibrateBtn.addEventListener('click', () => {
+        isCalibrating = false;
+        calibrationFrames = 0;
+        engine.resetCalibration();
+        bodyMotion.resetCalibration();
+        cancelCalibrateBtn.classList.add('hidden');
+        calibrateBtn.disabled = false;
+        calibrateBtn.textContent = 'Calibrate';
+        calibProgress.classList.add('hidden');
+        calibInstructions.innerHTML = 'What is the patient\'s <strong>current pain level</strong>?';
+        calibStatus.textContent = 'Calibration cancelled.';
+        markNeedsCalibration();
+        if (inputMode === 'video') {
+            videoEl.pause();
+        }
+    });
+
     async function onCalibrationComplete() {
         isCalibrating = false;
+        cancelCalibrateBtn.classList.add('hidden');
         calibrateBtn.textContent = 'Calibrated!';
+        clearNeedsCalibration();
         const level = engine.baselinePainLevel;
         calibInstructions.innerHTML = `Calibrated at pain level <strong>${level}</strong>. Returning...`;
         calibProgress.classList.add('hidden');

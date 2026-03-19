@@ -64,9 +64,14 @@
                 <div class="calib-progress hidden" id="calib-progress">
                     <div class="calib-progress-bar" id="calib-progress-bar"></div>
                 </div>
-                <button type="button" class="btn btn-primary btn-large" id="calibrate-btn" disabled>
-                    Calibrate
-                </button>
+                <div style="display:flex; gap:8px; justify-content:center; align-items:center;">
+                    <button type="button" class="btn btn-primary btn-large" id="calibrate-btn" disabled>
+                        Calibrate
+                    </button>
+                    <button type="button" class="btn btn-small hidden" id="cancel-calibrate-btn" style="background:#e74c3c;color:#fff;border-color:#c0392b;">
+                        Cancel
+                    </button>
+                </div>
                 <p class="calib-status" id="calib-status">Starting camera...</p>
             </div>
         </div>
