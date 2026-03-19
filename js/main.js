@@ -115,7 +115,11 @@
 
     const settingsBtn = document.getElementById('settings-btn');
     const settingsPanel = document.getElementById('settings-panel');
-    const resetSettingsBtn = document.getElementById('reset-settings-btn');
+    const presetSelect = document.getElementById('preset-select');
+    const presetSaveBtn = document.getElementById('preset-save-btn');
+    const presetDeleteBtn = document.getElementById('preset-delete-btn');
+    const PRESETS_KEY = 'paingauge_presets';
+    const ACTIVE_PRESET_KEY = 'paingauge_active_preset';
     const backendUrlInput = document.getElementById('set-backend-url');
     const connectionStatusEl = document.getElementById('connection-status');
 
@@ -343,6 +347,7 @@
                 }
 
                 saveSettings(settings);
+                markPresetModified();
             });
         }
     }
@@ -361,25 +366,130 @@
         }, 800);
     });
 
-    resetSettingsBtn.addEventListener('click', () => {
+    // ── Presets ────────────────────────────────────────────────
+
+    function markPresetModified() {
+        const active = presetSelect.value;
+        const currentOption = presetSelect.options[presetSelect.selectedIndex];
+        if (!currentOption) return;
+        const baseName = active === '__defaults__' ? 'Default' : active;
+        if (!currentOption.textContent.endsWith(' *')) {
+            currentOption.textContent = baseName + ' *';
+        }
+    }
+
+    function loadPresets() {
+        try {
+            const saved = localStorage.getItem(PRESETS_KEY);
+            if (saved) return JSON.parse(saved);
+        } catch (e) { /* ignore */ }
+        return {};
+    }
+
+    function savePresets(presets) {
+        localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+    }
+
+    function getSettingsSnapshot() {
+        // Capture all tunable settings (exclude backendUrl — it's per-machine)
+        const snap = {};
+        for (const key of Object.keys(DEFAULTS)) {
+            if (key === 'backendUrl') continue;
+            snap[key] = settings[key];
+        }
+        return snap;
+    }
+
+    function applyPresetSettings(preset) {
         const keepBackendUrl = settings.backendUrl;
-        settings = { ...DEFAULTS, backendUrl: keepBackendUrl };
+        settings = { ...DEFAULTS, ...preset, backendUrl: keepBackendUrl };
         applySettingsToUI(settings);
         const bodyMotionKeys = ['guardingSensitivity', 'bracingSensitivity',
             'restlessnessSensitivity', 'freezingSensitivity'];
         for (const key of Object.keys(DEFAULTS)) {
             if (key === 'sampleIntervalMs') {
-                SAMPLE_INTERVAL_MS = DEFAULTS[key];
+                SAMPLE_INTERVAL_MS = settings[key];
             } else if (key === 'backendUrl') {
                 // keep current backend URL
             } else if (bodyMotionKeys.includes(key)) {
-                bodyMotion[key] = DEFAULTS[key];
+                bodyMotion[key] = settings[key];
             } else {
-                engine[key] = DEFAULTS[key];
+                engine[key] = settings[key];
             }
         }
         saveSettings(settings);
+    }
+
+    function populatePresetDropdown() {
+        const presets = loadPresets();
+        const activePreset = localStorage.getItem(ACTIVE_PRESET_KEY) || '__defaults__';
+        presetSelect.innerHTML = '<option value="__defaults__">Default</option>';
+        for (const name of Object.keys(presets).sort()) {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            presetSelect.appendChild(option);
+        }
+        presetSelect.value = activePreset;
+        // If saved preset no longer exists, fall back to defaults
+        if (presetSelect.value !== activePreset) {
+            presetSelect.value = '__defaults__';
+            localStorage.setItem(ACTIVE_PRESET_KEY, '__defaults__');
+        }
+    }
+
+    presetSelect.addEventListener('change', () => {
+        const name = presetSelect.value;
+        localStorage.setItem(ACTIVE_PRESET_KEY, name);
+        if (name === '__defaults__') {
+            applyPresetSettings(DEFAULTS);
+        } else {
+            const presets = loadPresets();
+            if (presets[name]) {
+                applyPresetSettings(presets[name]);
+            }
+        }
     });
+
+    presetSaveBtn.addEventListener('click', () => {
+        const activePreset = presetSelect.value;
+        let name;
+        if (activePreset !== '__defaults__') {
+            // Offer to overwrite current or save new
+            name = prompt('Save preset as:', activePreset);
+        } else {
+            name = prompt('Preset name:');
+        }
+        if (!name || !name.trim()) return;
+        name = name.trim();
+        if (name === '__defaults__' || name.toLowerCase() === 'default') {
+            alert('Cannot overwrite the Default preset.');
+            return;
+        }
+        const presets = loadPresets();
+        presets[name] = getSettingsSnapshot();
+        savePresets(presets);
+        populatePresetDropdown();
+        presetSelect.value = name;
+        localStorage.setItem(ACTIVE_PRESET_KEY, name);
+    });
+
+    presetDeleteBtn.addEventListener('click', () => {
+        const name = presetSelect.value;
+        if (name === '__defaults__') {
+            alert('Cannot delete the Default preset.');
+            return;
+        }
+        if (!confirm(`Delete preset "${name}"?`)) return;
+        const presets = loadPresets();
+        delete presets[name];
+        savePresets(presets);
+        localStorage.setItem(ACTIVE_PRESET_KEY, '__defaults__');
+        applyPresetSettings(DEFAULTS);
+        populatePresetDropdown();
+    });
+
+    populatePresetDropdown();
 
     // ── Backend initialization ───────────────────────────────────
 

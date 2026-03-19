@@ -238,7 +238,13 @@
                 </div>
             </fieldset>
 
-            <button type="button" class="btn btn-small" id="reset-settings-btn">Reset to Defaults</button>
+            <div class="preset-bar">
+                <select id="preset-select" class="preset-select" title="Select a preset">
+                    <option value="__defaults__">Default</option>
+                </select>
+                <button type="button" class="btn btn-small" id="preset-save-btn" title="Save current settings as preset">Save</button>
+                <button type="button" class="btn btn-small btn-danger" id="preset-delete-btn" title="Delete selected preset">Delete</button>
+            </div>
         </div>
 
         <main>

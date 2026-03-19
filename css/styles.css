@@ -1011,8 +1011,33 @@ footer {
     background: #c0392b;
 }
 
-#reset-settings-btn {
-    margin-top: 8px;
+.preset-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.preset-select {
+    flex: 1;
+    font-size: 13px;
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #fff;
+    max-width: 250px;
+}
+
+.preset-bar .btn-danger {
+    background: #e74c3c;
+    color: #fff;
+    border-color: #c0392b;
+}
+
+.preset-bar .btn-danger:hover {
+    background: #c0392b;
 }
 
 #settings-btn.active {
