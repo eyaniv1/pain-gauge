@@ -745,7 +745,7 @@
             // This ensures the CNN contribution flows into the aggregate score
             // Only include modalities that have data AND nonzero weight
             const activeWeights = {};
-            if (engine.faceWeight > 0) activeWeights.face = engine.faceWeight;
+            if (result.facePain != null && engine.faceWeight > 0) activeWeights.face = engine.faceWeight;
             if (result.hrPain !== null && engine.hrWeight > 0) activeWeights.hr = engine.hrWeight;
             if (result.bodyPain !== null && engine.bodyWeight > 0) activeWeights.body = engine.bodyWeight;
             const totalW = (activeWeights.face || 0) + (activeWeights.hr || 0) + (activeWeights.body || 0);
@@ -946,7 +946,58 @@
         const mainWarning = document.getElementById('no-face-warning-main');
         if (mainWarning) mainWarning.classList.toggle('hidden', hasFace);
 
-        if (!hasFace) return;
+        // When no face detected, still compute score from other modalities
+        if (!hasFace) {
+            if (!engine.isCalibrated() || isCalibrating) return;
+
+            const physio = bleHR.isActive() ? { hr: bleHR.heartRate, hrv: bleHR.hrv } : null;
+            const bodyScore = (bodyMotion.lastResult && poseReady) ? bodyMotion.lastResult.score : null;
+
+            // Only proceed if we have at least one non-face modality with data
+            const hasHR = physio && engine.hrWeight > 0 && engine.hrBaseline;
+            const hasBody = bodyScore !== null && engine.bodyWeight > 0;
+            if (!hasHR && !hasBody) return;
+
+            // Compute HR pain if available
+            let hrPainScore = null;
+            if (hasHR) {
+                hrPainScore = engine.computeHRPainScore(physio.hr, physio.hrv);
+            }
+
+            // Build weighted fusion from available non-face modalities
+            const gw = {};
+            if (hrPainScore !== null && engine.hrWeight > 0) gw.hr = engine.hrWeight;
+            if (hasBody) gw.body = engine.bodyWeight;
+            const gwTotal = (gw.hr || 0) + (gw.body || 0);
+            let gaugeScore = 0;
+            if (gwTotal > 0) {
+                gaugeScore = (hrPainScore || 0) * ((gw.hr || 0) / gwTotal)
+                    + (bodyScore || 0) * ((gw.body || 0) / gwTotal);
+            }
+            gaugeScore = Math.max(0, Math.min(10, Math.round(gaugeScore * 10) / 10));
+            gauge.setScore(gaugeScore);
+
+            // Build a result-like object for sampling and display
+            const noFaceResult = {
+                score: gaugeScore,
+                rawScore: gaugeScore,
+                facePain: null,
+                hrPain: hrPainScore,
+                bodyPain: bodyScore,
+                aus: { au4: 0, au6_7: 0, au9_10: 0, au43: 0 },
+                pspi: 0,
+            };
+            updateAUBars(noFaceResult.aus);
+            updateEngineScores(noFaceResult);
+            lastResult = noFaceResult;
+
+            const hrPainEl = document.getElementById('hr-pain');
+            if (hrPainEl) {
+                hrPainEl.textContent = hrPainScore !== null ? hrPainScore.toFixed(1) : '--';
+            }
+            maybeRecordSample(noFaceResult);
+            return;
+        }
 
         const landmarks = results.multiFaceLandmarks[0];
         drawFaceMesh(landmarks);
