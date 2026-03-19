@@ -137,7 +137,13 @@ class SessionChart {
         for (const s of samples) {
             const time = s.timestamp_ms / 1000;
             if (s.score != null) this.series.total.data.push({ time, score: s.score });
-            if (s.ai_score != null) this.series.cnn.data.push({ time, score: s.ai_score });
+            if (s.face_score != null) this.series.face.data.push({ time, score: s.face_score });
+            if (s.au_score != null) this.series.au.data.push({ time, score: s.au_score });
+            if (s.cnn_score != null) this.series.cnn.data.push({ time, score: s.cnn_score });
+            // Fall back to ai_score for sessions recorded before cnn_score was stored
+            else if (s.ai_score != null) this.series.cnn.data.push({ time, score: s.ai_score });
+            if (s.body_score != null) this.series.body.data.push({ time, score: s.body_score });
+            if (s.hr_score != null) this.series.hr.data.push({ time, score: s.hr_score });
             if (s.frame) this.frameSamples.push({ time, frame: s.frame });
         }
 
