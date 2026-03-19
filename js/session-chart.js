@@ -144,7 +144,11 @@ class SessionChart {
             else if (s.ai_score != null) this.series.cnn.data.push({ time, score: s.ai_score });
             if (s.body_score != null) this.series.body.data.push({ time, score: s.body_score });
             if (s.hr_score != null) this.series.hr.data.push({ time, score: s.hr_score });
-            if (s.frame) this.frameSamples.push({ time, frame: s.frame });
+            if (s.frame) {
+                this.frameSamples.push({ time, frame: s.frame });
+            } else if (s.frame_filename) {
+                this.frameSamples.push({ time, frame: s.frame_filename, isFilename: true });
+            }
         }
 
         if (this.series.total.data.length > 0) {
@@ -219,13 +223,14 @@ class SessionChart {
 
         if (closest && this.onPointSelected) {
             // Find nearest frame
-            const frame = this._findNearestFrame(closest.time);
+            const frameInfo = this._findNearestFrame(closest.time);
             this.onPointSelected({
                 time: closest.time,
                 score: closest.score,
                 seriesKey: closest.seriesKey,
                 label: this.series[closest.seriesKey].label,
-                frame,
+                frame: frameInfo ? frameInfo.frame : null,
+                isFilename: frameInfo ? frameInfo.isFilename : false,
             });
         } else if (!closest && this.onPointSelected) {
             this.onPointSelected(null);
@@ -241,7 +246,8 @@ class SessionChart {
             if (d < bestDist) { best = f; bestDist = d; }
         }
         // Only return if within 2 seconds
-        return bestDist < 2 ? best.frame : null;
+        if (bestDist >= 2) return null;
+        return { frame: best.frame, isFilename: best.isFilename || false };
     }
 
     // ── Rendering ───────────────────────────────────────────────
@@ -465,10 +471,12 @@ class SessionChart {
         ctx.font = '14px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.fillText(this.chartTitle || 'Session Pain', chartX, 8);
+        const titleText = this.chartTitle || 'Session Pain';
+        ctx.fillText(titleText, chartX, 8);
+        const titleEndX = chartX + ctx.measureText(titleText).width + 15;
 
         // Interactive legend
-        this._drawLegend(ctx, chartX, chartW, w);
+        this._drawLegend(ctx, chartX, chartW, w, titleEndX);
 
         // Stats bar
         this._drawStats(ctx, chartX, chartY, chartW, chartH, elapsed);
@@ -540,7 +548,7 @@ class SessionChart {
         this.canvas.style.cursor = 'crosshair';
     }
 
-    _drawLegend(ctx, chartX, chartW, w) {
+    _drawLegend(ctx, chartX, chartW, w, titleEndX) {
         this._legendHitAreas = [];
         const legendY = 6;
         const itemH = 16;
@@ -551,7 +559,8 @@ class SessionChart {
         const items = Object.entries(this.series);
         const itemWidths = items.map(([, s]) => checkSize + 5 + 18 + 4 + ctx.measureText(s.label).width);
         const totalWidth = itemWidths.reduce((a, b) => a + b + 10, -10);
-        let legendX = Math.max(chartX + 120, chartX + chartW - totalWidth);
+        const minLegendX = titleEndX || (chartX + 120);
+        let legendX = Math.max(minLegendX, chartX + chartW - totalWidth);
 
         for (let i = 0; i < items.length; i++) {
             const [key, series] = items[i];

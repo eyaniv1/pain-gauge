@@ -171,7 +171,7 @@
         const frameModalImg = document.getElementById('frame-modal-img');
         const frameModalTitle = document.getElementById('frame-modal-title');
         if (info && info.frame) {
-            frameModalImg.src = info.frame;
+            frameModalImg.src = info.isFilename ? PainGaugeAPI.frameUrl(info.frame) : info.frame;
             frameModalTitle.textContent = `${info.label}: ${info.score.toFixed(1)} @ ${Math.floor(info.time / 60)}:${Math.floor(info.time % 60).toString().padStart(2, '0')}`;
             frameModal.classList.remove('hidden');
         }
