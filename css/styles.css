@@ -1342,6 +1342,24 @@ footer {
     border-bottom: 1px dotted #999;
 }
 
+.touch-tooltip {
+    position: absolute;
+    background: #333;
+    color: #fff;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 9999;
+    pointer-events: none;
+    animation: tooltipFade 2.5s ease-out forwards;
+}
+
+@keyframes tooltipFade {
+    0%, 70% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
 .frame-thumb {
     width: 52px;
     height: 38px;
@@ -1604,6 +1622,26 @@ footer {
         font-size: 11px;
     }
 
+    .weight-lock-btn {
+        padding: 5px 7px;
+        min-height: 32px;
+        min-width: 32px;
+    }
+
+    .preset-bar {
+        flex-wrap: wrap;
+    }
+
+    .preset-select {
+        max-width: none;
+        min-width: 0;
+    }
+
+    .preset-bar .btn {
+        min-height: 36px;
+        padding: 6px 12px;
+    }
+
     /* History table: hide less-important columns on mobile */
     .col-hide-mobile {
         display: none;
@@ -1685,6 +1723,38 @@ footer {
 
     .panel-score {
         font-size: 22px;
+    }
+
+    .preset-bar {
+        gap: 6px;
+    }
+
+    .preset-select {
+        font-size: 12px;
+    }
+
+    .weight-lock-btn {
+        padding: 4px 6px;
+    }
+
+    .setting-item label {
+        min-width: 80px;
+    }
+
+    /* History samples table: tighter on small screens */
+    .history-table-samples td,
+    .history-table-samples th {
+        padding: 3px 4px;
+        font-size: 10px;
+    }
+
+    .frame-thumb {
+        width: 40px;
+        height: 30px;
+    }
+
+    .score-with-tip {
+        font-size: 10px;
     }
 }
 

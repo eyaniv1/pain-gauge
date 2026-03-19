@@ -1723,6 +1723,28 @@
         }
     }
 
+    // ── Touch tooltip for score cells ─────────────────────────
+
+    historySamplesTbody.addEventListener('click', (e) => {
+        const tip = e.target.closest('.score-with-tip');
+        if (!tip || !tip.title) return;
+
+        // Remove any existing touch tooltip
+        const existing = document.querySelector('.touch-tooltip');
+        if (existing) existing.remove();
+
+        const popup = document.createElement('div');
+        popup.className = 'touch-tooltip';
+        popup.textContent = tip.title;
+        document.body.appendChild(popup);
+
+        const rect = tip.getBoundingClientRect();
+        popup.style.left = Math.max(4, rect.left + rect.width / 2 - popup.offsetWidth / 2) + 'px';
+        popup.style.top = (rect.top - popup.offsetHeight - 6 + window.scrollY) + 'px';
+
+        setTimeout(() => popup.remove(), 2500);
+    });
+
     // ── History helpers ────────────────────────────────────────
 
     function formatDateTime(date) {
