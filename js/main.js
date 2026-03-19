@@ -265,11 +265,35 @@
     }
 
     const fusionWeightKeys = ['faceWeight', 'hrWeight', 'bodyWeight'];
+    const lockedWeights = new Set();
+
+    // Wire up lock buttons
+    document.querySelectorAll('.weight-lock-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const key = btn.dataset.weight;
+            if (lockedWeights.has(key)) {
+                lockedWeights.delete(key);
+                btn.classList.remove('locked');
+                btn.title = 'Lock this weight';
+            } else {
+                lockedWeights.add(key);
+                btn.classList.add('locked');
+                btn.title = 'Unlock this weight';
+            }
+        });
+    });
 
     function redistributeFusionWeights(changedKey, newVal) {
-        const otherKeys = fusionWeightKeys.filter(k => k !== changedKey);
+        // Only redistribute to unlocked, non-changed sliders
+        const otherKeys = fusionWeightKeys.filter(k => k !== changedKey && !lockedWeights.has(k));
+        const lockedSum = fusionWeightKeys
+            .filter(k => k !== changedKey && lockedWeights.has(k))
+            .reduce((s, k) => s + settings[k], 0);
+        const remaining = Math.max(0, 1 - newVal - lockedSum);
+
+        if (otherKeys.length === 0) return; // all others locked, can't redistribute
+
         const otherSum = otherKeys.reduce((s, k) => s + settings[k], 0);
-        const remaining = Math.max(0, 1 - newVal);
 
         for (const k of otherKeys) {
             // Distribute remaining proportionally; if others were all zero, split evenly
@@ -298,6 +322,12 @@
                     'restlessnessSensitivity', 'freezingSensitivity'];
 
                 if (fusionWeightKeys.includes(key)) {
+                    if (lockedWeights.has(key)) {
+                        // Revert — can't change a locked slider
+                        el.value = settings[key];
+                        valEl.textContent = settings[key];
+                        return;
+                    }
                     engine[key] = val;
                     redistributeFusionWeights(key, val);
                 } else if (key === 'smoothingSize') {
