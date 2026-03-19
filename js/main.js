@@ -1042,11 +1042,6 @@
         // Build multimodal data for fusion
         const physio = bleHR.isActive() ? { hr: bleHR.heartRate, hrv: bleHR.hrv } : null;
         const bodyScore = (bodyMotion.lastResult && poseReady) ? bodyMotion.lastResult.score : null;
-        if (!poseReady && sessionActive) {
-            console.warn('[fusion] poseReady=false, bodyMotion.lastResult=', bodyMotion.lastResult);
-        } else if (!bodyMotion.lastResult && poseReady && sessionActive) {
-            console.warn('[fusion] poseReady=true but bodyMotion.lastResult is null');
-        }
         const result = engine.process(landmarks, physio, bodyScore);
         // Recompute gauge score with same weighted fusion as chart total
         // (result.score from pain-engine always includes face; we need to respect weight=0)
