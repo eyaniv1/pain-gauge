@@ -37,6 +37,41 @@
         backendUrl: '',
     };
 
+    // Built-in presets (cannot be deleted or overwritten by user)
+    const BUILTIN_PRESETS = {
+        'Physiotherapy': {
+            ...DEFAULTS,
+            // Face is primary signal during active movement
+            faceWeight: 0.6,
+            hrWeight: 0.3,
+            bodyWeight: 0.1,
+            // Minimize motion-based scores that conflict with exercises
+            guardingSensitivity: 0.2,
+            restlessnessSensitivity: 0,
+            // Keep pain-avoidance indicators
+            freezingSensitivity: 1.0,
+            bracingSensitivity: 0.7,
+        },
+        'Post-Operative': {
+            ...DEFAULTS,
+            // Patients are mostly still; body signals are reliable
+            faceWeight: 0.4,
+            hrWeight: 0.3,
+            bodyWeight: 0.3,
+            // Guarding and freezing are strong post-op pain indicators
+            guardingSensitivity: 1.2,
+            freezingSensitivity: 1.2,
+            bracingSensitivity: 1.0,
+            restlessnessSensitivity: 0.5,
+        },
+        'Face Only': {
+            ...DEFAULTS,
+            faceWeight: 1.0,
+            hrWeight: 0,
+            bodyWeight: 0,
+        },
+    };
+
     function loadSettings() {
         try {
             const saved = localStorage.getItem(SETTINGS_KEY);
@@ -420,10 +455,22 @@
         saveSettings(settings);
     }
 
+    function isBuiltinPreset(name) {
+        return name === '__defaults__' || name in BUILTIN_PRESETS;
+    }
+
     function populatePresetDropdown() {
         const presets = loadPresets();
         const activePreset = localStorage.getItem(ACTIVE_PRESET_KEY) || '__defaults__';
         presetSelect.innerHTML = '<option value="__defaults__">Default</option>';
+        // Built-in presets
+        for (const name of Object.keys(BUILTIN_PRESETS).sort()) {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = name;
+            presetSelect.appendChild(option);
+        }
+        // User-created presets
         for (const name of Object.keys(presets).sort()) {
             const option = document.createElement('option');
             option.value = name;
@@ -443,6 +490,8 @@
         localStorage.setItem(ACTIVE_PRESET_KEY, name);
         if (name === '__defaults__') {
             applyPresetSettings(DEFAULTS);
+        } else if (BUILTIN_PRESETS[name]) {
+            applyPresetSettings(BUILTIN_PRESETS[name]);
         } else {
             const presets = loadPresets();
             if (presets[name]) {
@@ -454,7 +503,7 @@
     presetSaveBtn.addEventListener('click', () => {
         const activePreset = presetSelect.value;
         let name;
-        if (activePreset !== '__defaults__') {
+        if (!isBuiltinPreset(activePreset)) {
             // Offer to overwrite current or save new
             name = prompt('Save preset as:', activePreset);
         } else {
@@ -462,8 +511,8 @@
         }
         if (!name || !name.trim()) return;
         name = name.trim();
-        if (name === '__defaults__' || name.toLowerCase() === 'default') {
-            alert('Cannot overwrite the Default preset.');
+        if (isBuiltinPreset(name) || name.toLowerCase() === 'default') {
+            alert('Cannot overwrite a built-in preset.');
             return;
         }
         const presets = loadPresets();
@@ -476,8 +525,8 @@
 
     presetDeleteBtn.addEventListener('click', () => {
         const name = presetSelect.value;
-        if (name === '__defaults__') {
-            alert('Cannot delete the Default preset.');
+        if (isBuiltinPreset(name)) {
+            alert('Cannot delete a built-in preset.');
             return;
         }
         if (!confirm(`Delete preset "${name}"?`)) return;
