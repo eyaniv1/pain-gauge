@@ -25,6 +25,10 @@ class BleHeartRate {
         this.onUpdate = null;      // ({ hr, hrv, rr }) => {}
         this.onStatusChange = null; // (status: 'connected'|'disconnected'|'simulating') => {}
 
+        // HR-derived RR fallback (for sensors that don't send RR intervals)
+        this._lastHrTimestamp = 0;
+        this._lastHrValue = 0;
+
         // Simulation
         this._simInterval = null;
         this._simBaseHR = 72;
@@ -123,6 +127,8 @@ class BleHeartRate {
         this.rrIntervals = [];
         this.hrv = 0;
         this.heartRate = 0;
+        this._lastHrTimestamp = 0;
+        this._lastHrValue = 0;
     }
 
     // ── Parsing ──────────────────────────────────────────────
@@ -134,8 +140,6 @@ class BleHeartRate {
         const hasEnergy = flags & 0x08;
         const hasRR = flags & 0x10;
         let offset = 1;
-
-        console.log(`[BLE HR] flags=0x${flags.toString(16)} is16Bit=${!!is16Bit} hasRR=${!!hasRR} hasEnergy=${!!hasEnergy} bytes=${dataView.byteLength}`);
 
         // Heart rate value
         if (is16Bit) {
@@ -152,15 +156,22 @@ class BleHeartRate {
         }
 
         // RR intervals (if present, bit 4 of flags)
+        let gotRR = false;
         if (hasRR) {
             while (offset + 1 < dataView.byteLength) {
                 const rr = dataView.getUint16(offset, true);
                 // RR is in 1/1024 seconds, convert to ms
                 const rrMs = (rr / 1024) * 1000;
-                console.log(`[BLE HR] RR raw=${rr} → ${rrMs.toFixed(1)}ms, total RRs=${this.rrIntervals.length + 1}`);
                 this._addRR(rrMs);
+                gotRR = true;
                 offset += 2;
             }
+        }
+
+        // Fallback: derive RR from HR when sensor doesn't send RR intervals
+        if (!gotRR && this.heartRate > 0) {
+            const rrMs = 60000 / this.heartRate;
+            this._addRR(rrMs);
         }
 
         this._emitUpdate();
