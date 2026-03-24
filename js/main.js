@@ -551,6 +551,9 @@
         localStorage.setItem('painGaugePatientId', currentPatientId);
         // Clear chart and reload history for new patient
         chart.resetRecording();
+        // Exit session detail view back to sessions list
+        document.getElementById('history-samples-view').classList.add('hidden');
+        document.getElementById('history-sessions-view').classList.remove('hidden');
         loadHistorySessions();
         markNeedsCalibration();
     });
