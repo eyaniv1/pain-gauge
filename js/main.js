@@ -407,7 +407,8 @@
     function markPresetModified() {
         const active = presetSelect.value;
         const baseName = active === '__defaults__' ? 'Default' : active;
-        const mark = baseName + ' *';
+        const prefix = isBuiltinPreset(active) ? '\u25CF ' : '';
+        const mark = prefix + baseName + ' *';
         // Mark both dropdowns
         [presetSelect, headerPresetSelect].forEach(sel => {
             const opt = sel.options[sel.selectedIndex];
@@ -466,10 +467,10 @@
     function populatePresetDropdown() {
         const presets = loadPresets();
         const activePreset = localStorage.getItem(ACTIVE_PRESET_KEY) || '__defaults__';
-        const optionsHtml = ['<option value="__defaults__">Default</option>'];
+        const optionsHtml = ['<option value="__defaults__">&#9679; Default</option>'];
         // Built-in presets
         for (const name of Object.keys(BUILTIN_PRESETS).sort()) {
-            optionsHtml.push(`<option value="${name}">${name}</option>`);
+            optionsHtml.push(`<option value="${name}">&#9679; ${name}</option>`);
         }
         // User-created presets
         for (const name of Object.keys(presets).sort()) {
