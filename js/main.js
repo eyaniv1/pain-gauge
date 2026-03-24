@@ -151,6 +151,7 @@
     const settingsBtn = document.getElementById('settings-btn');
     const settingsPanel = document.getElementById('settings-panel');
     const presetSelect = document.getElementById('preset-select');
+    const headerPresetSelect = document.getElementById('header-preset-select');
     const presetSaveBtn = document.getElementById('preset-save-btn');
     const presetDeleteBtn = document.getElementById('preset-delete-btn');
     const PRESETS_KEY = 'paingauge_presets';
@@ -405,12 +406,15 @@
 
     function markPresetModified() {
         const active = presetSelect.value;
-        const currentOption = presetSelect.options[presetSelect.selectedIndex];
-        if (!currentOption) return;
         const baseName = active === '__defaults__' ? 'Default' : active;
-        if (!currentOption.textContent.endsWith(' *')) {
-            currentOption.textContent = baseName + ' *';
-        }
+        const mark = baseName + ' *';
+        // Mark both dropdowns
+        [presetSelect, headerPresetSelect].forEach(sel => {
+            const opt = sel.options[sel.selectedIndex];
+            if (opt && !opt.textContent.endsWith(' *')) {
+                opt.textContent = mark;
+            }
+        });
     }
 
     function loadPresets() {
@@ -462,31 +466,29 @@
     function populatePresetDropdown() {
         const presets = loadPresets();
         const activePreset = localStorage.getItem(ACTIVE_PRESET_KEY) || '__defaults__';
-        presetSelect.innerHTML = '<option value="__defaults__">Default</option>';
+        const optionsHtml = ['<option value="__defaults__">Default</option>'];
         // Built-in presets
         for (const name of Object.keys(BUILTIN_PRESETS).sort()) {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            presetSelect.appendChild(option);
+            optionsHtml.push(`<option value="${name}">${name}</option>`);
         }
         // User-created presets
         for (const name of Object.keys(presets).sort()) {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            presetSelect.appendChild(option);
+            optionsHtml.push(`<option value="${name}">${name}</option>`);
         }
+        const html = optionsHtml.join('');
+        presetSelect.innerHTML = html;
+        headerPresetSelect.innerHTML = html;
         presetSelect.value = activePreset;
+        headerPresetSelect.value = activePreset;
         // If saved preset no longer exists, fall back to defaults
         if (presetSelect.value !== activePreset) {
             presetSelect.value = '__defaults__';
+            headerPresetSelect.value = '__defaults__';
             localStorage.setItem(ACTIVE_PRESET_KEY, '__defaults__');
         }
     }
 
-    presetSelect.addEventListener('change', () => {
-        const name = presetSelect.value;
+    function applyPresetByName(name) {
         localStorage.setItem(ACTIVE_PRESET_KEY, name);
         if (name === '__defaults__') {
             applyPresetSettings(DEFAULTS);
@@ -498,6 +500,18 @@
                 applyPresetSettings(presets[name]);
             }
         }
+    }
+
+    presetSelect.addEventListener('change', () => {
+        const name = presetSelect.value;
+        headerPresetSelect.value = name;
+        applyPresetByName(name);
+    });
+
+    headerPresetSelect.addEventListener('change', () => {
+        const name = headerPresetSelect.value;
+        presetSelect.value = name;
+        applyPresetByName(name);
     });
 
     presetSaveBtn.addEventListener('click', () => {

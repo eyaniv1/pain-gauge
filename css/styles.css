@@ -1045,6 +1045,18 @@ footer {
     border-color: #bbb;
 }
 
+/* ── Header Preset Dropdown ─────────────────────────────── */
+
+.header-preset-select {
+    font-size: 12px;
+    padding: 4px 6px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #f8f9fa;
+    max-width: 140px;
+    cursor: pointer;
+}
+
 /* ── Patient Selector ───────────────────────────────────── */
 
 .patient-selector {
@@ -1485,6 +1497,7 @@ footer {
     #camera-btn { order: 12; }
     #load-video-btn { order: 13; }
     #camera-select { order: 14; }
+    #header-preset-select { order: 15; max-width: 120px; }
     #settings-btn { order: 16; }
     .ai-status-dot { order: 17; }
 
