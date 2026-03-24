@@ -131,7 +131,11 @@ class BleHeartRate {
     _parseHeartRate(dataView) {
         const flags = dataView.getUint8(0);
         const is16Bit = flags & 0x01;
+        const hasEnergy = flags & 0x08;
+        const hasRR = flags & 0x10;
         let offset = 1;
+
+        console.log(`[BLE HR] flags=0x${flags.toString(16)} is16Bit=${!!is16Bit} hasRR=${!!hasRR} hasEnergy=${!!hasEnergy} bytes=${dataView.byteLength}`);
 
         // Heart rate value
         if (is16Bit) {
@@ -142,13 +146,18 @@ class BleHeartRate {
             offset += 1;
         }
 
+        // Skip Energy Expended if present (2 bytes)
+        if (hasEnergy) {
+            offset += 2;
+        }
+
         // RR intervals (if present, bit 4 of flags)
-        const hasRR = flags & 0x10;
         if (hasRR) {
             while (offset + 1 < dataView.byteLength) {
                 const rr = dataView.getUint16(offset, true);
                 // RR is in 1/1024 seconds, convert to ms
                 const rrMs = (rr / 1024) * 1000;
+                console.log(`[BLE HR] RR raw=${rr} → ${rrMs.toFixed(1)}ms, total RRs=${this.rrIntervals.length + 1}`);
                 this._addRR(rrMs);
                 offset += 2;
             }
